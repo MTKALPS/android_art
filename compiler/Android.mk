@@ -1,4 +1,9 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
 # Copyright (C) 2012 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -272,6 +277,15 @@ $$(ENUM_OPERATOR_OUT_GEN): $$(GENERATED_SRC_DIR)/%_operator_out.cc : $(LOCAL_PAT
   endif
   LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_build.mk
   LOCAL_ADDITIONAL_DEPENDENCIES += $(LOCAL_PATH)/Android.mk
+
+  ifeq ($(MTK_ART_OPT_ENABLE),true)
+    ifeq ($$(art_ndebug_or_debug),debug)
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-artd
+    else
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art
+    endif
+  endif
+
   # Vixl assembly support for ARM64 targets.
   ifeq ($$(art_ndebug_or_debug),debug)
     ifeq ($$(art_static_or_shared), static)

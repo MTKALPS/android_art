@@ -207,7 +207,6 @@ class InstructionCodeGeneratorMIPS : public InstructionCodeGenerator {
 
   FOR_EACH_CONCRETE_INSTRUCTION_COMMON(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_MIPS(DECLARE_VISIT_INSTRUCTION)
-
 #undef DECLARE_VISIT_INSTRUCTION
 
   void VisitInstruction(HInstruction* instruction) OVERRIDE {

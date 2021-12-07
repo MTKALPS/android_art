@@ -24,4 +24,11 @@ void HOptimization::MaybeRecordStat(MethodCompilationStat compilation_stat, size
   }
 }
 
+#ifdef MTK_ART_COMMON
+void HOptimization::MTKMaybeRecordStat(MethodCompilationStat compilation_stat, size_t count) const {
+  int stat = static_cast<int>(compilation_stat) + static_cast<int>(kMtkFirstStat) + 1;
+  MaybeRecordStat(static_cast<MethodCompilationStat>(stat), count);
+}
+#endif
+
 }  // namespace art

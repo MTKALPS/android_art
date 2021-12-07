@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -104,6 +109,9 @@ class CompilerDriver {
                  int swap_fd,
                  const ProfileCompilationInfo* profile_compilation_info);
 
+#ifdef MTK_ART_COMMON
+  virtual
+#endif
   ~CompilerDriver();
 
   // Set dex files that will be stored in the oat file after being compiled.
@@ -194,6 +202,13 @@ class CompilerDriver {
                                   const DexFile* dex_file,
                                   uint16_t class_def_index)
       REQUIRES(!requires_constructor_barrier_lock_);
+
+#ifdef MTK_ART_COMMON
+  void SetMethodCalledInLoop(uint32_t method_idx, uint32_t checksum)
+      REQUIRES(!method_stat_lock_);
+  bool IsMethodCalledInNestedLoop(uint32_t method_idx, uint32_t checksum) const
+      REQUIRES(!method_stat_lock_);
+#endif
 
   // Callbacks from compiler to see what runtime checks must be generated.
 
@@ -483,7 +498,26 @@ class CompilerDriver {
     return current_dex_to_dex_methods_;
   }
 
+#ifdef MTK_ART_COMMON
+  void SetDefaultCompilerArgs();
+  void SetCompilerArgs(std::string compiler_args);
+  uint64_t GetCompilerOptSqrSqitch() const {
+    return compiler_opt_sqr_switch_;
+  }
+
+  void TurnOnSqrOpt(uint64_t enable_opt) {
+    compiler_opt_sqr_switch_ |= enable_opt;
+  }
+
+  void TurnOffSqrOpt(uint32_t disable_opt) {
+    compiler_opt_sqr_switch_ &= ~static_cast<uint64_t>(1 << disable_opt);
+  }
+
+ protected:
+#else
+
  private:
+#endif
   // Return whether the declaring class of `resolved_member` is
   // available to `referrer_class` for read or write access using two
   // Boolean values returned as a pair. If is true at least for read
@@ -548,7 +582,13 @@ class CompilerDriver {
                                      uintptr_t* direct_code, uintptr_t* direct_method)
       SHARED_REQUIRES(Locks::mutator_lock_);
 
+#ifdef MTK_ART_COMMON
+
+ protected:
+#else
+
  private:
+#endif
   void PreCompile(jobject class_loader,
                   const std::vector<const DexFile*>& dex_files,
                   TimingLogger* timings)
@@ -606,7 +646,11 @@ class CompilerDriver {
   void UpdateImageClasses(TimingLogger* timings) REQUIRES(!Locks::mutator_lock_);
   static void FindClinitImageClassesCallback(mirror::Object* object, void* arg)
       SHARED_REQUIRES(Locks::mutator_lock_);
-
+#ifdef MTK_ART_COMMON
+  virtual void IPO_Analysis(jobject class_loader ATTRIBUTE_UNUSED,
+                 const std::vector<const DexFile*>& dex_files ATTRIBUTE_UNUSED,
+                 TimingLogger* timings ATTRIBUTE_UNUSED) {}
+#endif
   void Compile(jobject class_loader,
                const std::vector<const DexFile*>& dex_files,
                TimingLogger* timings) REQUIRES(!dex_to_dex_references_lock_);
@@ -660,6 +704,11 @@ class CompilerDriver {
   // in the .oat_patches ELF section if requested in the compiler options.
   size_t non_relative_linker_patch_count_ GUARDED_BY(compiled_methods_lock_);
 
+#ifdef MTK_ART_COMMON
+  mutable Mutex method_stat_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
+  std::vector<std::pair<uint32_t, uint32_t>> method_called_in_loop_ GUARDED_BY(method_stat_lock_);
+#endif
+
   const bool boot_image_;
   const bool app_image_;
 
@@ -679,13 +728,18 @@ class CompilerDriver {
 
   bool had_hard_verifier_failure_;
 
+#ifdef MTK_ART_COMMON
+ protected:
+#endif
   // A thread pool that can (potentially) run tasks in parallel.
   std::unique_ptr<ThreadPool> parallel_thread_pool_;
   size_t parallel_thread_count_;
 
   // A thread pool that guarantees running single-threaded on the main thread.
   std::unique_ptr<ThreadPool> single_thread_pool_;
-
+#ifdef MTK_ART_COMMON
+ private:
+#endif
   class AOTCompilationStats;
   std::unique_ptr<AOTCompilationStats> stats_;
 
@@ -721,6 +775,12 @@ class CompilerDriver {
   const BitVector* current_dex_to_dex_methods_;
 
   friend class CompileClassVisitor;
+#ifdef MTK_ART_COMMON
+  uint64_t compiler_opt_sqr_switch_;
+  friend class ParseClassVisitor;
+ private:
+#endif
+
   DISALLOW_COPY_AND_ASSIGN(CompilerDriver);
 };
 

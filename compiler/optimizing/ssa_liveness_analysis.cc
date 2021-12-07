@@ -43,6 +43,13 @@ static bool IsInnerLoop(HLoopInformation* outer, HLoopInformation* inner) {
       && inner->IsIn(*outer);
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+Primitive::Type GetLIType(HInstruction* current) {
+  return current->GetType();
+}
+#endif
+
 static void AddToListForLinearization(ArenaVector<HBasicBlock*>* worklist, HBasicBlock* block) {
   HLoopInformation* block_loop = block->GetLoopInformation();
   auto insert_pos = worklist->rbegin();  // insert_pos.base() will be the actual position.
@@ -125,8 +132,14 @@ void SsaLivenessAnalysis::NumberInstructions() {
       if (locations != nullptr && locations->Out().IsValid()) {
         instructions_from_ssa_index_.push_back(current);
         current->SetSsaIndex(ssa_index++);
+#ifdef MTK_ART_COMMON
+        // [TODO]: check further.
+        current->SetLiveInterval(
+            LiveInterval::MakeInterval(graph_->GetArena(), GetLIType(current), current));
+#else
         current->SetLiveInterval(
             LiveInterval::MakeInterval(graph_->GetArena(), current->GetType(), current));
+#endif
       }
       current->SetLifetimePosition(lifetime_position);
     }
@@ -143,8 +156,13 @@ void SsaLivenessAnalysis::NumberInstructions() {
       if (locations != nullptr && locations->Out().IsValid()) {
         instructions_from_ssa_index_.push_back(current);
         current->SetSsaIndex(ssa_index++);
+#ifdef MTK_ART_COMMON
+        current->SetLiveInterval(
+            LiveInterval::MakeInterval(graph_->GetArena(), GetLIType(current), current));
+#else
         current->SetLiveInterval(
             LiveInterval::MakeInterval(graph_->GetArena(), current->GetType(), current));
+#endif
       }
       instructions_from_lifetime_position_.push_back(current);
       current->SetLifetimePosition(lifetime_position);

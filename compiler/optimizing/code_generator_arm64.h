@@ -188,6 +188,147 @@ class FieldAccessCallingConventionARM64 : public FieldAccessCallingConvention {
   DISALLOW_COPY_AND_ASSIGN(FieldAccessCallingConventionARM64);
 };
 
+#ifdef MTK_ART_COMMON
+class Arm64AsmWrapper {
+ public:
+  explicit Arm64AsmWrapper(CodeGeneratorARM64* codegen)
+      : codegen_(codegen), wrapper_status_(0) {}
+
+  #define MACRO_LIST(V)  \
+    V(adrp, 2, const vixl::Register&, rd, int, imm21)  \
+    V(Adr, 2, const vixl::Register&, rd, vixl::Label*, label)  \
+    V(B, 1, vixl::Label*, label)  \
+    V(B, 2, vixl::Label*, label, vixl::Condition, cond)  \
+    V(B, 2, vixl::Condition, cond, vixl::Label*, label)  \
+    V(Cbnz, 2, const vixl::Register&, rt, vixl::Label*, label)  \
+    V(Cbz, 2, const vixl::Register&, rt, vixl::Label*, label)  \
+    V(Tbnz, 3, const vixl::Register&, rt, unsigned, bit_pos, vixl::Label*, label)  \
+    V(Tbz, 3, const vixl::Register&, rt, unsigned, bit_pos, vixl::Label*, label)  \
+    V(bl, 1, int, imm26)  \
+    V(Bl, 1, vixl::Label*, label)  \
+    V(Blr, 1, const vixl::Register&, xn)  \
+    V(Br, 1, const vixl::Register&, xn)  \
+    V(Ret, 0)  \
+    V(ldr, 2, const vixl::CPURegister&, rt, const vixl::MemOperand&, src)  \
+    V(Ldr, 2, const vixl::CPURegister&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldr, 2, const vixl::CPURegister&, rt, vixl::RawLiteral*, literal)  \
+    V(Ldrb, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldrsb, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldrh, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldrsh, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldrsw, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Str, 2, const vixl::CPURegister&, rt, const vixl::MemOperand&, addr)  \
+    V(Strb, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Strh, 2, const vixl::Register&, rt, const vixl::MemOperand&, addr)  \
+    V(Ldar, 2, const vixl::Register&, rt, const vixl::MemOperand&, src)  \
+    V(Ldarb, 2, const vixl::Register&, rt, const vixl::MemOperand&, src)  \
+    V(Ldarh, 2, const vixl::Register&, rt, const vixl::MemOperand&, src)  \
+    V(Stlr, 2, const vixl::Register&, rt, const vixl::MemOperand&, dst)  \
+    V(Stlrb, 2, const vixl::Register&, rt, const vixl::MemOperand&, dst)  \
+    V(Stlrh, 2, const vixl::Register&, rt, const vixl::MemOperand&, dst)  \
+    V(LoadCPURegList, 2, vixl::CPURegList, registers, const vixl::MemOperand&, src)  \
+    V(StoreCPURegList, 2, vixl::CPURegList, registers, const vixl::MemOperand&, dst)  \
+    V(add, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Add, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Sub, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Subs, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Mul, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Neg, 2, const vixl::Register&, rd, const vixl::Operand&, operand)  \
+    V(And, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Orr, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Eor, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Bic, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Orn, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Eon, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Lsl, 3, const vixl::Register&, rd, const vixl::Register&, rn, unsigned, shift)  \
+    V(Lsl, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Lsr, 3, const vixl::Register&, rd, const vixl::Register&, rn, unsigned, shift)  \
+    V(Lsr, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Asr, 3, const vixl::Register&, rd, const vixl::Register&, rn, unsigned, shift)  \
+    V(Asr, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Ror, 3, const vixl::Register&, rd, const vixl::Register&, rs, unsigned, shift)  \
+    V(Ror, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Sdiv, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Smulh, 3, const vixl::Register&, xd, const vixl::Register&, xn, const vixl::Register&, xm)  \
+    V(Smull, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Mneg, 3, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm)  \
+    V(Madd, 4, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm, const vixl::Register&, ra)  \
+    V(Msub, 4, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Register&, rm, const vixl::Register&, ra)  \
+    V(Ubfx, 4, const vixl::Register&, rd, const vixl::Register&, rn, unsigned, lsb, unsigned, width)  \
+    V(Sbfx, 4, const vixl::Register&, rd, const vixl::Register&, rn, unsigned, lsb, unsigned, width)  \
+    V(Fadd, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm)  \
+    V(Fsub, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm)  \
+    V(Fmul, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm)  \
+    V(Fdiv, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm)  \
+    V(Fneg, 2, const vixl::VRegister&, vd, const vixl::VRegister&, vn)  \
+    V(Fmadd, 4, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm, const vixl::VRegister&, va)\
+    V(Cmp, 2, const vixl::Register&, rn, const vixl::Operand&, operand)  \
+    V(Csel, 4, const vixl::Register&, rd, const vixl::Register&, rn, const vixl::Operand&, operand, vixl::Condition, cond)  \
+    V(Cneg, 3, const vixl::Register&, rd, const vixl::Register&, rn, vixl::Condition, cond)  \
+    V(Cset, 2, const vixl::Register&, rd, vixl::Condition, cond)  \
+    V(Csetm, 2, const vixl::Register&, rd, vixl::Condition, cond)  \
+    V(Fcmp, 2, const vixl::VRegister&, vn, const vixl::VRegister&, vm)  \
+    V(Fcmp, 2, const vixl::VRegister&, vn, double, value)  \
+    V(Fcsel, 4, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm, vixl::Condition, cond)  \
+    V(Fcvt, 2, const vixl::VRegister&, vd, const vixl::VRegister&, vn)  \
+    V(Fcvtzs, 2, const vixl::Register&, rd, const vixl::VRegister&, vn)  \
+    V(Fcvtzs, 2, const vixl::VRegister&, vd, const vixl::VRegister&, vn)  \
+    V(Scvtf, 2, const vixl::VRegister&, vd, const vixl::Register&, rn)  \
+    V(Scvtf, 2, const vixl::VRegister&, vd, const vixl::VRegister&, vn)  \
+    V(Mov, 2, const vixl::Register&, rd, uint64_t, imm)  \
+    V(Mov, 2, const vixl::Register&, rd, const vixl::Register&, rn)  \
+    V(Mvn, 2, const vixl::Register&, rd, const vixl::Operand&, operand)  \
+    V(Fmov, 2, vixl::VRegister, vd, vixl::VRegister, vn)  \
+    V(Fmov, 2, vixl::VRegister, vd, vixl::Register, rn)  \
+    V(Fmov, 2, vixl::Register, rd, vixl::VRegister, vn)  \
+    V(Fmov, 2, vixl::VRegister, vd, double, imm)  \
+    V(Fmov, 2, vixl::VRegister, vd, float, imm)  \
+    V(Nop, 0)  \
+    V(nop, 0)  \
+    V(Bind, 1, vixl::Label*, label)  \
+    V(Dmb, 2, vixl::BarrierDomain, domain, vixl::BarrierType, type)  \
+    V(Drop, 1, const vixl::Operand&, size)  \
+    V(place, 1, vixl::RawLiteral*, literal)  \
+    V(FinalizeCode, 0)  \
+    V(Dup, 2, const vixl::VRegister&, vd, const vixl::Register&, rn)  \
+    V(Dup, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, int, vn_index)  \
+    V(Addv, 2, const vixl::VRegister&, vd, const vixl::VRegister&, vn)  \
+    V(Mov, 3, vixl::VRegister, vd, int, vd_index, vixl::Register, rn) \
+    V(Add, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm) \
+    V(Sub, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm) \
+    V(Mul, 3, const vixl::VRegister&, vd, const vixl::VRegister&, vn, const vixl::VRegister&, vm)
+
+  #define DECLARE_ASM_WRAPPER_FUNC_0(NAME, ...)                           \
+    void NAME();
+  #define DECLARE_ASM_WRAPPER_FUNC_1(NAME, T1, V1)                         \
+    void NAME(T1 V1);
+  #define DECLARE_ASM_WRAPPER_FUNC_2(NAME, T1, V1, T2, V2)                   \
+    void NAME(T1 V1, T2 V2);
+  #define DECLARE_ASM_WRAPPER_FUNC_3(NAME, T1, V1, T2, V2, T3, V3)             \
+    void NAME(T1 V1, T2 V2, T3 V3);
+  #define DECLARE_ASM_WRAPPER_FUNC_4(NAME, T1, V1, T2, V2, T3, V3, T4, V4)       \
+    void NAME(T1 V1, T2 V2, T3 V3, T4 V4);
+  #define DECLARE_ASM_WRAPPER_FUNC_5(NAME, T1, V1, T2, V2, T3, V3, T4, V4, T5, V5) \
+    void NAME(T1 V1, T2 V2, T3 V3, T4 V4, T5 V5);
+
+  #define DECLARE_ASM_WRAPPER_FUNC(NAME, NUMARG, ...)                              \
+    DECLARE_ASM_WRAPPER_FUNC_##NUMARG(NAME, __VA_ARGS__)
+    MACRO_LIST(DECLARE_ASM_WRAPPER_FUNC)
+  #undef DECLARE_ASM_WRAPPER_FUNC
+
+  // template functions
+  template<typename T>
+  vixl::Literal<T>* CreateLiteralDestroyedWithPool(T value);
+
+  void SetWrapperStatus(int status) { wrapper_status_ = status; }
+  int GetWrapperStatus() { return wrapper_status_; }
+
+private:
+  CodeGeneratorARM64* const codegen_;
+  int wrapper_status_;
+};
+#endif
+
 class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
  public:
   InstructionCodeGeneratorARM64(HGraph* graph, CodeGeneratorARM64* codegen);
@@ -208,6 +349,10 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
 
   Arm64Assembler* GetAssembler() const { return assembler_; }
   vixl::MacroAssembler* GetVIXLAssembler() { return GetAssembler()->vixl_masm_; }
+#ifdef MTK_ART_COMMON
+  Arm64AsmWrapper* GetArm64AsmWrapper();
+  bool SwDivideInstruction(int64_t);
+#endif
 
  private:
   void GenerateClassInitializationCheck(SlowPathCodeARM64* slow_path, vixl::Register class_reg);
@@ -297,6 +442,9 @@ class LocationsBuilderARM64 : public HGraphVisitor {
     LOG(FATAL) << "Unreachable instruction " << instruction->DebugName()
                << " (id " << instruction->GetId() << ")";
   }
+#ifdef MTK_ART_COMMON
+  bool SwDivideInstruction(int64_t);
+#endif
 
  private:
   void HandleBinaryOp(HBinaryOperation* instr);
@@ -377,6 +525,11 @@ class CodeGeneratorARM64 : public CodeGenerator {
   Arm64Assembler* GetAssembler() OVERRIDE { return &assembler_; }
   const Arm64Assembler& GetAssembler() const OVERRIDE { return assembler_; }
   vixl::MacroAssembler* GetVIXLAssembler() { return GetAssembler()->vixl_masm_; }
+#ifdef MTK_ART_COMMON
+  Arm64AsmWrapper* GetArm64AsmWrapper() { return &asm_wrapper_; }
+  const CompilerDriver* GetCompilerDriver() OVERRIDE { return compiler_driver_; }
+  void SetCompilerDriver(CompilerDriver* compiler_driver) { compiler_driver_ = compiler_driver; }
+#endif
 
   // Emit a write barrier.
   void MarkGCCard(vixl::Register object, vixl::Register value, bool value_can_be_null);
@@ -627,6 +780,10 @@ class CodeGeneratorARM64 : public CodeGenerator {
   InstructionCodeGeneratorARM64 instruction_visitor_;
   ParallelMoveResolverARM64 move_resolver_;
   Arm64Assembler assembler_;
+#ifdef MTK_ART_COMMON
+  Arm64AsmWrapper asm_wrapper_;
+  CompilerDriver* compiler_driver_;
+#endif
   const Arm64InstructionSetFeatures& isa_features_;
 
   // Deduplication map for 32-bit literals, used for non-patchable boot image addresses.
@@ -655,6 +812,11 @@ class CodeGeneratorARM64 : public CodeGenerator {
 inline Arm64Assembler* ParallelMoveResolverARM64::GetAssembler() const {
   return codegen_->GetAssembler();
 }
+#ifdef MTK_ART_COMMON
+inline Arm64AsmWrapper* InstructionCodeGeneratorARM64::GetArm64AsmWrapper() {
+  return down_cast<CodeGeneratorARM64*>(codegen_)->GetArm64AsmWrapper();
+}
+#endif
 
 }  // namespace arm64
 }  // namespace art

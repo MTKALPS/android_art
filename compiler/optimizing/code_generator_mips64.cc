@@ -54,6 +54,11 @@ Location Mips64ReturnLocation(Primitive::Type return_type) {
 
     case Primitive::kPrimVoid:
       return Location();
+
+#ifdef MTK_ART_COMMON
+    default:
+      UNREACHABLE();
+#endif
   }
   UNREACHABLE();
 }
@@ -1412,6 +1417,9 @@ void InstructionCodeGeneratorMIPS64::VisitArrayGet(HArrayGet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << instruction->GetType();
       UNREACHABLE();
   }
@@ -1574,6 +1582,9 @@ void InstructionCodeGeneratorMIPS64::VisitArraySet(HArraySet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << instruction->GetType();
       UNREACHABLE();
   }
@@ -2752,6 +2763,9 @@ void InstructionCodeGeneratorMIPS64::HandleFieldGet(HInstruction* instruction,
       load_type = kLoadUnsignedWord;
       break;
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }
@@ -2807,6 +2821,9 @@ void InstructionCodeGeneratorMIPS64::HandleFieldSet(HInstruction* instruction,
       store_type = kStoreDoubleword;
       break;
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }

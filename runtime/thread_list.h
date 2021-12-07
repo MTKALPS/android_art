@@ -158,6 +158,10 @@ class ThreadList {
 
   bool Contains(Thread* thread) REQUIRES(Locks::thread_list_lock_);
   bool Contains(pid_t tid) REQUIRES(Locks::thread_list_lock_);
+#ifdef MTK_ART_FIX_THREAD_LIST_MEM_LEAKAGE
+  std::list<Thread*>::iterator FindThread(Thread* thread) REQUIRES(Locks::thread_list_lock_);
+#endif
+
   size_t RunCheckpoint(Closure* checkpoint_function, bool includeSuspended)
       REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_);
 

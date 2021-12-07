@@ -2756,6 +2756,9 @@ class CheckJNI {
           result_check = "D";
           break;
         case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+        default:
+#endif
           LOG(FATAL) << "Unexpected type: " << type;
           break;
       }
@@ -2841,6 +2844,9 @@ class CheckJNI {
           }
           break;
         case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+        default:
+#endif
           LOG(FATAL) << "Unexpected type: " << type;
           break;
       }

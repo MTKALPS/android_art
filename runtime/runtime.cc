@@ -2062,4 +2062,10 @@ char** Runtime::EnvSnapshot::GetSnapshot() const {
   return c_env_vector_.get();
 }
 
+#ifdef MTK_ARTOPT_VERSION
+__attribute__((weak))
+void Runtime::MTK_DumpVersion(void) {
+}
+#endif
+
 }  // namespace art

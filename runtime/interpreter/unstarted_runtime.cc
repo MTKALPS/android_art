@@ -945,11 +945,16 @@ static void UnstartedMemoryPeek(
     case Primitive::kPrimDouble:
     case Primitive::kPrimVoid:
     case Primitive::kPrimNot:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Not in the Memory API: " << type;
       UNREACHABLE();
   }
+#ifndef MTK_ART_COMMON
   LOG(FATAL) << "Should not reach here";
   UNREACHABLE();
+#endif
 }
 
 void UnstartedRuntime::UnstartedMemoryPeekByte(
@@ -1014,11 +1019,16 @@ static void UnstartedMemoryPeekArray(
     case Primitive::kPrimDouble:
     case Primitive::kPrimVoid:
     case Primitive::kPrimNot:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Not in the Memory API: " << type;
       UNREACHABLE();
   }
+#ifndef MTK_ART_COMMON
   LOG(FATAL) << "Should not reach here";
   UNREACHABLE();
+#endif
 }
 
 void UnstartedRuntime::UnstartedMemoryPeekByteArray(

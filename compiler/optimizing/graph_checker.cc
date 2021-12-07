@@ -566,6 +566,9 @@ void GraphChecker::HandleLoop(HBasicBlock* loop_header) {
         loop_information->GetPreHeader()->GetSuccessors().size()));
   }
 
+#ifdef MTK_ART_COMMON
+// TODO - N migration: workaround this check for suspend check elimination
+#else
   if (loop_information->GetSuspendCheck() == nullptr) {
     AddError(StringPrintf(
         "Loop with header %d does not have a suspend check.",
@@ -577,6 +580,7 @@ void GraphChecker::HandleLoop(HBasicBlock* loop_header) {
         "Loop header %d does not have the loop suspend check as the first instruction.",
         loop_header->GetBlockId()));
   }
+#endif
 
   // Ensure the loop header has only one incoming branch and the remaining
   // predecessors are back edges.

@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -149,8 +154,13 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
 #define UNLIKELY(x)     __builtin_expect((x), false)
 
 // Stringify the argument.
+#ifdef MTK_ART_COMMON
+#define QUOTE(x...) #x
+#define STRINGIFY(x) QUOTE(x)
+#else
 #define QUOTE(x) #x
 #define STRINGIFY(x) QUOTE(x)
+#endif
 
 #ifndef NDEBUG
 #define ALWAYS_INLINE

@@ -29,6 +29,10 @@ namespace art {
 // Cast entrypoints.
 extern "C" uint32_t artIsAssignableFromCode(const mirror::Class* klass,
                                             const mirror::Class* ref_class);
+#ifdef MTK_ART_COMMON
+extern "C" int32_t artLpow32(int32_t a, int32_t b);
+extern "C" int64_t artLpow64(int64_t a, int64_t b);
+#endif
 
 void InitEntryPoints(JniEntryPoints* jpoints, QuickEntryPoints* qpoints) {
   DefaultInitEntryPoints(jpoints, qpoints);
@@ -47,6 +51,12 @@ void InitEntryPoints(JniEntryPoints* jpoints, QuickEntryPoints* qpoints) {
   qpoints->pL2d = nullptr;
   qpoints->pFmodf = fmodf;
   qpoints->pL2f = nullptr;
+#ifdef MTK_ART_COMMON
+  qpoints->pIpow32 = artLpow32;
+  qpoints->pIpow64 = artLpow64;
+  qpoints->pFpowf = powf;
+  qpoints->pFpow = pow;
+#endif
   qpoints->pD2iz = nullptr;
   qpoints->pF2iz = nullptr;
   qpoints->pIdivmod = nullptr;

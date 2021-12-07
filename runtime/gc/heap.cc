@@ -73,6 +73,9 @@
 #include "handle_scope-inl.h"
 #include "thread_list.h"
 #include "well_known_classes.h"
+#ifdef MTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK
+#include "scoped_gc_critical_section.h"
+#endif
 
 namespace art {
 
@@ -3628,6 +3631,9 @@ void Heap::GrowForUtilization(collector::GarbageCollector* collector_ran,
 }
 
 void Heap::ClampGrowthLimit() {
+#ifdef MTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK
+  ScopedGCCriticalSection gcs(Thread::Current(), kGcCauseTrim, kCollectorTypeHeapTrim);
+#endif
   // Use heap bitmap lock to guard against races with BindLiveToMarkBitmap.
   ScopedObjectAccess soa(Thread::Current());
   WriterMutexLock mu(soa.Self(), *Locks::heap_bitmap_lock_);

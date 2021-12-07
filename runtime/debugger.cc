@@ -1738,11 +1738,16 @@ static JValue GetArtFieldValue(ArtField* f, mirror::Object* o)
       return field_value;
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Attempt to read from field of type 'void'";
       UNREACHABLE();
   }
+#ifndef MTK_ART_COMMON
   LOG(FATAL) << "Attempt to read from field of unknown type";
   UNREACHABLE();
+#endif
 }
 
 static JDWP::JdwpError GetFieldValueImpl(JDWP::RefTypeId ref_type_id, JDWP::ObjectId object_id,
@@ -1876,11 +1881,16 @@ static JDWP::JdwpError SetArtFieldValue(ArtField* f, mirror::Object* o, uint64_t
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Attempt to write to field of type 'void'";
       UNREACHABLE();
   }
+#ifndef MTK_ART_COMMON
   LOG(FATAL) << "Attempt to write to field of unknown type";
   UNREACHABLE();
+#endif
 }
 
 static JDWP::JdwpError SetFieldValueImpl(JDWP::ObjectId object_id, JDWP::FieldId field_id,

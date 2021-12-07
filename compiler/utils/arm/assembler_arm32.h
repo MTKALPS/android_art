@@ -248,6 +248,23 @@ class Arm32Assembler FINAL : public ArmAssembler {
 
   // Memory barriers.
   void dmb(DmbOptions flavor) OVERRIDE;
+#ifdef MTK_ART_COMMON
+  void vdup(VRegister vd, Register rt, Primitive::Type vector_type) OVERRIDE;
+  void vaddq(VRegister vd, VRegister vn, VRegister vm,
+             Primitive::Type vector_type) OVERRIDE;
+  void vaddq(DRegister dd, DRegister dn, DRegister dm) OVERRIDE;
+  void vmulq(VRegister vd, VRegister vn, VRegister vm,
+             Primitive::Type vector_type) OVERRIDE;
+  void vpaddl(VRegister vd, VRegister vn, Primitive::Type vector_type) OVERRIDE;
+  void vldm(VRegister vd, const Address& ad,
+            Primitive::Type vector_type,
+            Condition cond = AL) OVERRIDE;
+  void vstm(VRegister vn, const Address& ad,
+            Primitive::Type vector_type,
+            Condition cond = AL) OVERRIDE;
+  void vmovvr(VRegister vd, int vd_index, Register rt,
+              Primitive::Type vector_type, bool r2v = true, Condition cond = AL) OVERRIDE;
+#endif
 
   // Get the final position of a label after local fixup based on the old position
   // recorded before FinalizeCode().

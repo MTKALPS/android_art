@@ -97,6 +97,31 @@ enum DRegister {  // private marker to avoid generate-operator-out.py from proce
 };
 std::ostream& operator<<(std::ostream& os, const DRegister& rhs);
 
+#ifdef MTK_ART_COMMON
+// Values for double-precision floating point registers.
+enum VRegister {  // private marker to avoid generate-operator-out.py from processing.
+  Q0  = 0,
+  Q1  = 1,
+  Q2  = 2,
+  Q3  = 3,
+  Q4  = 4,
+  Q5  = 5,
+  Q6  = 6,
+  Q7  = 7,
+  Q8  = 8,
+  Q9  = 9,
+  Q10 = 10,
+  Q11 = 11,
+  Q12 = 12,
+  Q13 = 13,
+  Q14 = 14,
+  Q15 = 15,
+  kNumberOfQRegisters = 16,
+  kNumberOfOverlappingQRegisters = 8,
+  kNoQRegister = -1,
+};
+std::ostream& operator<<(std::ostream& os, const VRegister& rhs);
+#endif
 
 // Values for the condition field as defined in Table A8-1 "Condition
 // codes" (refer to Section A8.3 "Conditional execution").

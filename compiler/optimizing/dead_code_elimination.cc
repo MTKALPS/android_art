@@ -172,6 +172,10 @@ void HDeadCodeElimination::RemoveDeadInstructions() {
           // If we added an explicit barrier then we should keep it.
           && !inst->IsMemoryBarrier()
           && !inst->IsParameterValue()
+          && !inst->IsMemoryBarrier()  // If we added an explicit barrier then we should keep it.
+#ifdef MTK_ART_COMMON
+          && !inst->IsZeroBranch()  // Don't delete this kind instruction for inliner
+#endif
           && !inst->HasUses()) {
         block->RemoveInstruction(inst);
         MaybeRecordStat(MethodCompilationStat::kRemovedDeadInstruction);

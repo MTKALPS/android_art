@@ -580,6 +580,13 @@ void HLoopInformation::PopulateRecursive(HBasicBlock* block) {
     return;
   }
 
+  #ifdef MTK_ART_COMMON
+  // Nested loops
+  if (block->IsLoopHeader()) {
+    is_nested_ = true;
+  }
+  #endif
+
   blocks_.SetBit(block->GetBlockId());
   block->SetInLoop(this);
   if (block->IsLoopHeader()) {
@@ -877,6 +884,19 @@ void HBasicBlock::RemoveInstruction(HInstruction* instruction, bool ensure_safet
   DCHECK(!instruction->IsPhi());
   Remove(&instructions_, this, instruction, ensure_safety);
 }
+
+#ifdef MTK_ART_COMMON
+void HBasicBlock::BackwardRemoveInstructions(HInstruction* instruction, int32_t number,
+                                             bool ensure_safety) {
+  // Backward avoid use-def dependence error
+  for (int32_t i = 0; i < number; ++i)  {
+    DCHECK(instruction != nullptr);
+    HInstruction* previous = instruction->GetPrevious();
+    RemoveInstruction(instruction, ensure_safety);
+    instruction = previous;
+  }
+}
+#endif
 
 void HBasicBlock::RemovePhi(HPhi* phi, bool ensure_safety) {
   Remove(&phis_, this, phi, ensure_safety);
@@ -1990,6 +2010,56 @@ void HGraph::UpdateLoopAndTryInformationOfNewBlock(HBasicBlock* block,
       : nullptr;
   block->SetTryCatchInformation(try_catch_info);
 }
+
+#ifdef MTK_ART_COMMON
+void HBasicBlock::ChainSuccessor(HBasicBlock* to) {
+  AddSuccessor(to);
+  if (IsInLoop()) {
+    HLoopInformation* loop_info = GetLoopInformation();
+    // loop_info->Add(to); // TODO check existent
+
+    if (loop_info->IsBackEdge(*this)) {
+      LOG(INFO) << " Replace back edge : bb " << to->GetBlockId();
+      loop_info->ReplaceBackEdge(this, to);
+    }
+  }
+}
+
+void HGraph::ChainAfter(HBasicBlock* at, HBasicBlock* to) {
+  to->SetGraph(this);
+  AddBlock(to);
+
+  // Loop information
+  if (at->IsInLoop()) {
+    HLoopInformation* loop_info = at->GetLoopInformation();
+    loop_info->Add(to);
+
+    if (loop_info->IsBackEdge(*at)) {
+      loop_info->ReplaceBackEdge(at, to);
+    }
+
+    to->SetLoopInformation(loop_info);
+    for (HLoopInformationOutwardIterator loop_it(*at); !loop_it.Done(); loop_it.Advance()) {
+      loop_it.Current()->Add(to);
+    }
+  }
+
+  // transel order
+  size_t blocks_added = 1;
+  // Find the location of `at` in the outer graph's reverse post order. The new
+  // blocks will be added after it.
+  size_t index_of_at = 0;
+  while (reverse_post_order_[index_of_at] != at) {
+    index_of_at++;
+  }
+  MakeRoomFor(&reverse_post_order_, blocks_added, index_of_at);
+  reverse_post_order_[++index_of_at] = to;
+
+  // Domination
+  to->SetDominator(at);
+  at->AddDominatedBlock(to);
+}
+#endif
 
 HInstruction* HGraph::InlineInto(HGraph* outer_graph, HInvoke* invoke) {
   DCHECK(HasExitBlock()) << "Unimplemented scenario";

@@ -34,6 +34,99 @@ namespace verifier {
 class MethodVerifier;
 }  // namespace verifier
 
+#ifdef MTK_ART_COMMON
+enum InlineMethodOpcode : uint16_t {
+  kIntrinsicDoubleCvt,
+  kIntrinsicFloatCvt,
+  kIntrinsicFloat2Int,
+  kIntrinsicDouble2Long,
+  kIntrinsicFloatIsInfinite,
+  kIntrinsicDoubleIsInfinite,
+  kIntrinsicFloatIsNaN,
+  kIntrinsicDoubleIsNaN,
+  kIntrinsicReverseBits,
+  kIntrinsicReverseBytes,
+  kIntrinsicBitCount,
+  kIntrinsicCompare,
+  kIntrinsicHighestOneBit,
+  kIntrinsicLowestOneBit,
+  kIntrinsicNumberOfLeadingZeros,
+  kIntrinsicNumberOfTrailingZeros,
+  kIntrinsicRotateRight,
+  kIntrinsicRotateLeft,
+  kIntrinsicSignum,
+  kIntrinsicAbsInt,
+  kIntrinsicAbsLong,
+  kIntrinsicAbsFloat,
+  kIntrinsicAbsDouble,
+  kIntrinsicMinMaxInt,
+  kIntrinsicMinMaxLong,
+  kIntrinsicMinMaxFloat,
+  kIntrinsicMinMaxDouble,
+  kIntrinsicCos,
+  kIntrinsicSin,
+  kIntrinsicAcos,
+  kIntrinsicAsin,
+  kIntrinsicAtan,
+  kIntrinsicAtan2,
+  kIntrinsicCbrt,
+  kIntrinsicCosh,
+  kIntrinsicExp,
+  kIntrinsicExpm1,
+  kIntrinsicHypot,
+  kIntrinsicLog,
+  kIntrinsicLog10,
+  kIntrinsicNextAfter,
+  kIntrinsicSinh,
+  kIntrinsicTan,
+  kIntrinsicTanh,
+  kIntrinsicSqrt,
+  kIntrinsicCeil,
+  kIntrinsicFloor,
+  kIntrinsicRint,
+  kIntrinsicRoundFloat,
+  kIntrinsicRoundDouble,
+  kIntrinsicReferenceGetReferent,
+  kIntrinsicCharAt,
+  kIntrinsicCompareTo,
+  kIntrinsicEquals,
+  kIntrinsicGetCharsNoCheck,
+  kIntrinsicIsEmptyOrLength,
+  kIntrinsicIndexOf,
+  kIntrinsicNewStringFromBytes,
+  kIntrinsicNewStringFromChars,
+  kIntrinsicNewStringFromString,
+  kIntrinsicCurrentThread,
+  kIntrinsicPeek,
+  kIntrinsicPoke,
+  kIntrinsicCas,
+  kIntrinsicUnsafeGet,
+  kIntrinsicUnsafePut,
+
+  // 1.8.
+  kIntrinsicUnsafeGetAndAddInt,
+  kIntrinsicUnsafeGetAndAddLong,
+  kIntrinsicUnsafeGetAndSetInt,
+  kIntrinsicUnsafeGetAndSetLong,
+  kIntrinsicUnsafeGetAndSetObject,
+  kIntrinsicUnsafeLoadFence,
+  kIntrinsicUnsafeStoreFence,
+  kIntrinsicUnsafeFullFence,
+
+  kIntrinsicSystemArrayCopyCharArray,
+  kIntrinsicSystemArrayCopy,
+
+  kInlineOpNop,
+  kInlineOpReturnArg,
+  kInlineOpNonWideConst,
+  kInlineOpIGet,
+  kInlineOpIPut,
+  kInlineOpConstructor,
+  kInlineStringInit,
+  kInlineOpSecret,
+  kInlineOpBlindGut,
+};
+#else
 enum InlineMethodOpcode : uint16_t {
   kIntrinsicDoubleCvt,
   kIntrinsicFloatCvt,
@@ -123,6 +216,7 @@ enum InlineMethodOpcode : uint16_t {
   kInlineOpConstructor,
   kInlineStringInit,
 };
+#endif
 std::ostream& operator<<(std::ostream& os, const InlineMethodOpcode& rhs);
 
 enum InlineMethodFlags : uint16_t {
@@ -203,6 +297,9 @@ struct InlineMethod {
     InlineIGetIPutData ifield_data;
     InlineReturnArgData return_data;
     InlineConstructorData constructor_data;
+#ifdef MTK_ART_COMMON
+    const DexFile::CodeItem* code_item;  // point to the code that will be inlined
+#endif
   } d;
 };
 
@@ -261,6 +358,12 @@ class InlineMethodAnalyser {
                                 ArtMethod* method,
                                 InlineMethod* result)
       SHARED_REQUIRES(Locks::mutator_lock_);
+#ifdef MTK_ART_COMMON
+  static bool IsMethodInlineEasily(const uint16_t* code_ptr, const uint16_t* code_end);
+  static bool AnalyseCustomMethod(verifier::MethodVerifier* verifier,
+                                  const DexFile::CodeItem* code_item, InlineMethod* result)
+      SHARED_REQUIRES(Locks::mutator_lock_);
+#endif
 
   // Can we fast path instance field access in a verified accessor?
   // If yes, computes field's offset and volatility and whether the method is static or not.

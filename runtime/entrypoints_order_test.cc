@@ -325,9 +325,17 @@ class EntrypointsOrderTest : public CommonRuntimeTest {
     EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pReadBarrierMark, pReadBarrierSlow, sizeof(void*));
     EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pReadBarrierSlow, pReadBarrierForRootSlow,
                          sizeof(void*));
-
+#ifdef MTK_ART_COMMON
+    EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pReadBarrierForRootSlow, pIpow32, sizeof(void*));
+    EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pIpow32, pIpow64, sizeof(void*));
+    EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pIpow64, pFpow, sizeof(void*));
+    EXPECT_OFFSET_DIFFNP(QuickEntryPoints, pFpow, pFpowf, sizeof(void*));
+    CHECKED(OFFSETOF_MEMBER(QuickEntryPoints, pFpowf)
+            + sizeof(void*) == sizeof(QuickEntryPoints), QuickEntryPoints_all);
+#else
     CHECKED(OFFSETOF_MEMBER(QuickEntryPoints, pReadBarrierForRootSlow)
             + sizeof(void*) == sizeof(QuickEntryPoints), QuickEntryPoints_all);
+#endif
   }
 };
 

@@ -69,6 +69,10 @@ using helpers::WRegisterFrom;
 using helpers::XRegisterFrom;
 using helpers::ARM64EncodableConstantOrRegister;
 using helpers::ArtVixlRegCodeCoherentForRegSet;
+#ifdef MTK_ART_COMMON
+using helpers::InputVRegisterAt;
+using helpers::OutputVRegister;
+#endif
 
 static constexpr int kCurrentMethodStackOffset = 0;
 // The compare/jump sequence will generate about (1.5 * num_entries + 3) instructions. While jump
@@ -124,6 +128,12 @@ Location ARM64ReturnLocation(Primitive::Type return_type) {
   } else if (return_type == Primitive::kPrimVoid) {
     return Location::NoLocation();
   } else {
+#ifdef MTK_ART_COMMON
+    if (Primitive::IsVectorType(return_type)) {
+      // [TODO]: check further.
+      return LocationFrom(d0);
+    }
+#endif
     return LocationFrom(w0);
   }
 }
@@ -132,7 +142,11 @@ Location InvokeRuntimeCallingConvention::GetReturnLocation(Primitive::Type retur
   return ARM64ReturnLocation(return_type);
 }
 
+#if defined(MTK_ART_COMMON) && defined(MTK_ART_WRAPPER)
+#define __ down_cast<CodeGeneratorARM64*>(codegen)->GetArm64AsmWrapper()->
+#else
 #define __ down_cast<CodeGeneratorARM64*>(codegen)->GetVIXLAssembler()->
+#endif
 #define QUICK_ENTRY_POINT(x) QUICK_ENTRYPOINT_OFFSET(kArm64WordSize, x).Int32Value()
 
 // Calculate memory accessing operand for save/restore live registers.
@@ -905,6 +919,10 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
       instruction_visitor_(graph, this),
       move_resolver_(graph->GetArena(), this),
       assembler_(graph->GetArena()),
+#ifdef MTK_ART_COMMON
+      asm_wrapper_(this),
+      compiler_driver_(nullptr),
+#endif
       isa_features_(isa_features),
       uint32_literals_(std::less<uint32_t>(),
                        graph->GetArena()->Adapter(kArenaAllocCodeGenerator)),
@@ -925,7 +943,13 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
   AddAllocatedRegister(LocationFrom(lr));
 }
 
+#undef __
+
+#if defined(MTK_ART_COMMON) && defined(MTK_ART_WRAPPER)
+#define __ GetArm64AsmWrapper()->
+#else
 #define __ GetVIXLAssembler()->
+#endif
 
 void CodeGeneratorARM64::EmitJumpTables() {
   for (auto&& jump_table : jump_tables_) {
@@ -1305,6 +1329,13 @@ void CodeGeneratorARM64::Load(Primitive::Type type,
     case Primitive::kPrimLong:
     case Primitive::kPrimFloat:
     case Primitive::kPrimDouble:
+#ifdef MTK_ART_COMMON
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+#endif
       DCHECK_EQ(dst.Is64Bits(), Primitive::Is64BitType(type));
       __ Ldr(dst, src);
       break;
@@ -1379,6 +1410,9 @@ void CodeGeneratorARM64::LoadAcquire(HInstruction* instruction,
       break;
     }
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
   }
 }
@@ -1400,6 +1434,13 @@ void CodeGeneratorARM64::Store(Primitive::Type type,
     case Primitive::kPrimLong:
     case Primitive::kPrimFloat:
     case Primitive::kPrimDouble:
+#ifdef MTK_ART_COMMON
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+#endif
       DCHECK_EQ(src.Is64Bits(), Primitive::Is64BitType(type));
       __ Str(src, dst);
       break;
@@ -1436,6 +1477,13 @@ void CodeGeneratorARM64::StoreRelease(Primitive::Type type,
       DCHECK_EQ(src.Is64Bits(), Primitive::Is64BitType(type));
       __ Stlr(Register(src), base);
       break;
+#ifdef MTK_ART_COMMON
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+#endif
     case Primitive::kPrimFloat:
     case Primitive::kPrimDouble: {
       DCHECK(src.IsFPRegister());
@@ -1573,6 +1621,9 @@ enum UnimplementedInstructionBreakCode {
 #undef UNIMPLEMENTED_INSTRUCTION_BREAK_CODE
 #undef FOR_EACH_UNIMPLEMENTED_INSTRUCTION
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void LocationsBuilderARM64::HandleBinaryOp(HBinaryOperation* instr) {
   DCHECK_EQ(instr->InputCount(), 2U);
   LocationSummary* locations = new (GetGraph()->GetArena()) LocationSummary(instr);
@@ -1719,6 +1770,9 @@ void InstructionCodeGeneratorARM64::HandleFieldSet(HInstruction* instruction,
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM64::HandleBinaryOp(HBinaryOperation* instr) {
   Primitive::Type type = instr->GetType();
 
@@ -2045,6 +2099,9 @@ void LocationsBuilderARM64::VisitArrayGet(HArrayGet* instruction) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM64::VisitArrayGet(HArrayGet* instruction) {
   Primitive::Type type = instruction->GetType();
   Register obj = InputRegisterAt(instruction, 0);
@@ -2072,8 +2129,20 @@ void InstructionCodeGeneratorARM64::VisitArrayGet(HArrayGet* instruction) {
     // General case.
     MemOperand source = HeapOperand(obj);
     if (index.IsConstant()) {
-      offset += Int64ConstantFrom(index) << Primitive::ComponentSizeShift(type);
-      source = HeapOperand(obj, offset);
+#ifdef MTK_ART_COMMON
+      if (instruction->GetArray()->IsGetElementPtr()) {
+        CHECK_EQ(Int64ConstantFrom(index), 0);
+        int num_elts = (Primitive::IsVectorType(type) ? Primitive::GetNumberElements(type) : 1);
+        source = (instruction->NeedsAddressIncrement())
+                   ? HeapOperand(obj, num_elts * Primitive::ComponentSize(type), vixl::PostIndex)
+                   : HeapOperand(obj);
+      } else {
+#endif
+        offset += Int64ConstantFrom(index) << Primitive::ComponentSizeShift(type);
+        source = HeapOperand(obj, offset);
+#ifdef MTK_ART_COMMON
+      }
+#endif
     } else {
       Register temp = temps.AcquireSameSizeAs(obj);
       if (instruction->GetArray()->IsArm64IntermediateAddress()) {
@@ -2094,7 +2163,15 @@ void InstructionCodeGeneratorARM64::VisitArrayGet(HArrayGet* instruction) {
       source = HeapOperand(temp, XRegisterFrom(index), LSL, Primitive::ComponentSizeShift(type));
     }
 
+#ifdef MTK_ART_COMMON
+    if (Primitive::IsVectorType(type)) {
+      codegen_->Load(type, OutputVRegister(instruction), source);
+    } else {
+#endif
     codegen_->Load(type, OutputCPURegister(instruction), source);
+#ifdef MTK_ART_COMMON
+    }
+#endif
     codegen_->MaybeRecordImplicitNullCheck(instruction);
 
     if (type == Primitive::kPrimNot) {
@@ -2144,6 +2221,9 @@ void LocationsBuilderARM64::VisitArraySet(HArraySet* instruction) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM64::VisitArraySet(HArraySet* instruction) {
   Primitive::Type value_type = instruction->GetComponentType();
   LocationSummary* locations = instruction->GetLocations();
@@ -2163,8 +2243,21 @@ void InstructionCodeGeneratorARM64::VisitArraySet(HArraySet* instruction) {
   if (!needs_write_barrier) {
     DCHECK(!may_need_runtime_call_for_type_check);
     if (index.IsConstant()) {
-      offset += Int64ConstantFrom(index) << Primitive::ComponentSizeShift(value_type);
-      destination = HeapOperand(array, offset);
+#ifdef MTK_ART_COMMON
+        if (instruction->GetArray()->IsGetElementPtr()) {
+          CHECK_EQ(Int64ConstantFrom(index), 0);
+          int num_elts = (Primitive::IsVectorType(value_type) ? Primitive::GetNumberElements(value_type) : 1);
+          destination = (instruction->NeedsAddressIncrement())
+                     ? HeapOperand(array, num_elts * Primitive::ComponentSize(value_type), vixl::PostIndex)
+                     : HeapOperand(array);
+          value = InputVRegisterAt(instruction, 2);
+        } else {
+#endif
+        offset += Int64ConstantFrom(index) << Primitive::ComponentSizeShift(value_type);
+        destination = HeapOperand(array, offset);
+#ifdef MTK_ART_COMMON
+       }
+#endif
     } else {
       UseScratchRegisterScope temps(masm);
       Register temp = temps.AcquireSameSizeAs(array);
@@ -2632,7 +2725,12 @@ void InstructionCodeGeneratorARM64::GenerateDivRemIntegral(HBinaryOperation* ins
   Register out = OutputRegister(instruction);
   Location second = locations->InAt(1);
 
+#ifdef MTK_ART_COMMON
+  if (second.IsConstant() &&
+      SwDivideInstruction(Int64FromConstant(second.GetConstant()))) {
+#else
   if (second.IsConstant()) {
+#endif
     int64_t imm = Int64FromConstant(second.GetConstant());
 
     if (imm == 0) {
@@ -2666,7 +2764,16 @@ void LocationsBuilderARM64::VisitDiv(HDiv* div) {
     case Primitive::kPrimInt:
     case Primitive::kPrimLong:
       locations->SetInAt(0, Location::RequiresRegister());
+#ifdef MTK_ART_COMMON
+      if (div->InputAt(1)->IsConstant() &&
+          SwDivideInstruction(Int64FromConstant(div->InputAt(1)->AsConstant()))) {
+        locations->SetInAt(1, Location::RegisterOrConstant(div->InputAt(1)));
+      } else {
+        locations->SetInAt(1, Location::RequiresRegister());
+      }
+#else
       locations->SetInAt(1, Location::RegisterOrConstant(div->InputAt(1)));
+#endif
       locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
       break;
 
@@ -4156,6 +4263,94 @@ void InstructionCodeGeneratorARM64::VisitMonitorOperation(HMonitorOperation* ins
   }
 }
 
+#ifdef MTK_ART_COMMON
+void LocationsBuilderARM64::VisitMla(HMla* mla) {
+  LocationSummary* locations =
+      new (GetGraph()->GetArena()) LocationSummary(mla, LocationSummary::kNoCall);
+  switch (mla->GetResultType()) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong:
+      locations->SetInAt(0, Location::RequiresRegister());
+      locations->SetInAt(1, Location::RequiresRegister());
+      locations->SetInAt(2, Location::RequiresRegister());
+      locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
+      break;
+
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble:
+      locations->SetInAt(0, Location::RequiresFpuRegister());
+      locations->SetInAt(1, Location::RequiresFpuRegister());
+      locations->SetInAt(2, Location::RequiresFpuRegister());
+      locations->SetOut(Location::RequiresFpuRegister(), Location::kNoOutputOverlap);
+      break;
+
+    default:
+      LOG(FATAL) << "Unexpected mla type " << mla->GetResultType();
+  }
+}
+
+void InstructionCodeGeneratorARM64::VisitMla(HMla* mla) {
+  switch (mla->GetResultType()) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong:
+      __ Madd(OutputRegister(mla), InputRegisterAt(mla, 0), InputRegisterAt(mla, 1), InputRegisterAt(mla, 2));
+      break;
+
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble:
+      __ Fmadd(OutputFPRegister(mla), InputFPRegisterAt(mla, 0), InputFPRegisterAt(mla, 1), InputFPRegisterAt(mla, 2));
+      break;
+
+    default:
+      LOG(FATAL) << "Unexpected mla type " << mla->GetResultType();
+  }
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM64::VisitVectorSplat(HVectorSplat* value) {
+  UNUSED(value);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM64::VisitVectorSplat(HVectorSplat* value) {
+  UNUSED(value);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM64::VisitAddReduce(HAddReduce* value) {
+  UNUSED(value);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM64::VisitAddReduce(HAddReduce* value) {
+  UNUSED(value);
+}
+
+
+__attribute__((weak))
+void LocationsBuilderARM64::VisitGetElementPtr(HGetElementPtr* gep) {
+  UNUSED(gep);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM64::VisitGetElementPtr(HGetElementPtr* gep) {
+  UNUSED(gep);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM64::VisitConstantVector(HConstantVector* instr) {
+  UNUSED(instr);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM64::VisitConstantVector(HConstantVector* instr) {
+  UNUSED(instr);
+}
+#endif
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void LocationsBuilderARM64::VisitMul(HMul* mul) {
   LocationSummary* locations =
       new (GetGraph()->GetArena()) LocationSummary(mul, LocationSummary::kNoCall);
@@ -4179,6 +4374,9 @@ void LocationsBuilderARM64::VisitMul(HMul* mul) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM64::VisitMul(HMul* mul) {
   switch (mul->GetResultType()) {
     case Primitive::kPrimInt:
@@ -4342,6 +4540,79 @@ void CodeGeneratorARM64::GenerateImplicitNullCheck(HNullCheck* instruction) {
   RecordPcInfo(instruction, instruction->GetDexPc());
 }
 
+#ifdef MTK_ART_COMMON
+void LocationsBuilderARM64::VisitPow(HPow* pow) {
+  Primitive::Type type = pow->GetResultType();
+  LocationSummary::CallKind call_kind = LocationSummary::kCall;
+  LocationSummary* locations = new (GetGraph()->GetArena()) LocationSummary(pow, call_kind);
+
+  switch (type) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, LocationFrom(calling_convention.GetRegisterAt(0)));
+      locations->SetInAt(1, LocationFrom(calling_convention.GetRegisterAt(1)));
+      locations->SetOut(calling_convention.GetReturnLocation(type));
+      break;
+    }
+
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, LocationFrom(calling_convention.GetFpuRegisterAt(0)));
+      locations->SetInAt(1, LocationFrom(calling_convention.GetFpuRegisterAt(1)));
+      locations->SetOut(calling_convention.GetReturnLocation(type));
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected pow type " << type;
+  }
+}
+
+void InstructionCodeGeneratorARM64::VisitPow(HPow* pow) {
+  Primitive::Type type = pow->GetResultType();
+  switch (type) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong: {
+      int32_t entry_offset = (type == Primitive::kPrimInt) ? QUICK_ENTRY_POINT(pIpow32)
+                                                           : QUICK_ENTRY_POINT(pIpow64);
+      codegen_->InvokeRuntime(entry_offset, pow, pow->GetDexPc(), nullptr);
+      break;
+    }
+
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble: {
+      int32_t entry_offset = (type == Primitive::kPrimFloat) ? QUICK_ENTRY_POINT(pFpowf)
+                                                             : QUICK_ENTRY_POINT(pFpow);
+      codegen_->InvokeRuntime(entry_offset, pow, pow->GetDexPc(), nullptr);
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected pow type " << type;
+  }
+}
+
+// Same as VisitNullCheck
+void LocationsBuilderARM64::VisitZeroBranch(HZeroBranch* instruction) {
+  LocationSummary* locations =
+      new (GetGraph()->GetArena()) LocationSummary(instruction, LocationSummary::kNoCall);
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (instruction->HasUses()) {
+    locations->SetOut(Location::SameAsFirstInput());
+  }
+}
+
+void InstructionCodeGeneratorARM64::VisitZeroBranch(HZeroBranch* instruction) {
+  LocationSummary* locations = instruction->GetLocations();
+  Location obj = locations->InAt(0);
+
+  vixl::Label* true_target = codegen_->GetLabelOf(instruction->IfTrueSuccessor());
+  __ Cbz(RegisterFrom(obj, instruction->InputAt(0)->GetType()), true_target);
+}
+#endif
+
 void CodeGeneratorARM64::GenerateExplicitNullCheck(HNullCheck* instruction) {
   SlowPathCodeARM64* slow_path = new (GetGraph()->GetArena()) NullCheckSlowPathARM64(instruction);
   AddSlowPath(slow_path);
@@ -4421,7 +4692,16 @@ void LocationsBuilderARM64::VisitRem(HRem* rem) {
     case Primitive::kPrimInt:
     case Primitive::kPrimLong:
       locations->SetInAt(0, Location::RequiresRegister());
+#ifdef MTK_ART_COMMON
+      if (rem->InputAt(1)->IsConstant() &&
+          SwDivideInstruction(Int64FromConstant(rem->InputAt(1)->AsConstant()))) {
+        locations->SetInAt(1, Location::RegisterOrConstant(rem->InputAt(1)));
+      } else {
+        locations->SetInAt(1, Location::RequiresRegister());
+      }
+#else
       locations->SetInAt(1, Location::RegisterOrConstant(rem->InputAt(1)));
+#endif
       locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
       break;
 
@@ -5201,6 +5481,46 @@ void InstructionCodeGeneratorARM64::VisitClassTableGet(HClassTableGet* instructi
 
 #undef __
 #undef QUICK_ENTRY_POINT
+
+#ifdef MTK_ART_COMMON
+
+#define DEFINE_ASM_WRAPPER_FUNC_0(NAME, ...)                                    \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME()                                                  \
+  { codegen_->GetVIXLAssembler()->NAME(); }
+#define DEFINE_ASM_WRAPPER_FUNC_1(NAME, T1, V1)                                 \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME(T1 V1)                                             \
+  { codegen_->GetVIXLAssembler()->NAME(V1); }
+#define DEFINE_ASM_WRAPPER_FUNC_2(NAME, T1, V1, T2, V2)                         \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME(T1 V1, T2 V2)                                      \
+  { codegen_->GetVIXLAssembler()->NAME(V1, V2); }
+#define DEFINE_ASM_WRAPPER_FUNC_3(NAME, T1, V1, T2, V2, T3, V3)                 \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME(T1 V1, T2 V2, T3 V3)                               \
+  { codegen_->GetVIXLAssembler()->NAME(V1, V2, V3); }
+#define DEFINE_ASM_WRAPPER_FUNC_4(NAME, T1, V1, T2, V2, T3, V3, T4, V4)         \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME(T1 V1, T2 V2, T3 V3, T4 V4)                        \
+  { codegen_->GetVIXLAssembler()->NAME(V1, V2, V3, V4); }
+#define DEFINE_ASM_WRAPPER_FUNC_5(NAME, T1, V1, T2, V2, T3, V3, T4, V4, T5, V5) \
+  __attribute__((weak))                                                         \
+  void Arm64AsmWrapper::NAME(T1 V1, T2 V2, T3 V3, T4 V4, T5 V5)                 \
+  { codegen_->GetVIXLAssembler()->NAME(V1, V2, V3, V4, V5); }
+
+#define DEFINE_ASM_WRAPPER_FUNC(NAME, NUMARG, ...)                              \
+  DEFINE_ASM_WRAPPER_FUNC_##NUMARG(NAME, __VA_ARGS__)
+  MACRO_LIST(DEFINE_ASM_WRAPPER_FUNC)
+#undef DEFINE_ASM_WRAPPER_FUNC
+
+  // template function
+  template<typename T>
+  __attribute__((weak))
+  vixl::Literal<T>* Arm64AsmWrapper::CreateLiteralDestroyedWithPool(T value)
+  { return codegen_->GetVIXLAssembler()->CreateLiteralDestroyedWithPool(value); }
+
+#endif
 
 }  // namespace arm64
 }  // namespace art

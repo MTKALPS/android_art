@@ -39,6 +39,9 @@
 #include "scoped_thread_state_change.h"
 #include "thread-inl.h"
 #include "thread_list.h"
+#ifdef CHECK_JNI_HAVE_AEE_FEATURE
+#include "mt_aee_helper.h"
+#endif
 
 namespace art {
 
@@ -312,15 +315,20 @@ class Libraries {
   AllocationTrackingSafeMap<std::string, SharedLibrary*, kAllocatorTagJNILibraries> libraries_
       GUARDED_BY(Locks::jni_libraries_lock_);
 };
-
 class JII {
  public:
+#ifdef MTK_ART_RUNTIME_FREED_FIX
+  static bool is_vm_shut_down_;
+#endif
   static jint DestroyJavaVM(JavaVM* vm) {
     if (vm == nullptr) {
       return JNI_ERR;
     }
     JavaVMExt* raw_vm = reinterpret_cast<JavaVMExt*>(vm);
     delete raw_vm->GetRuntime();
+#ifdef MTK_ART_RUNTIME_FREED_FIX
+    is_vm_shut_down_ = true;
+#endif
     android::ResetNativeLoader();
     return JNI_OK;
   }
@@ -339,6 +347,11 @@ class JII {
     }
     JavaVMExt* raw_vm = reinterpret_cast<JavaVMExt*>(vm);
     Runtime* runtime = raw_vm->GetRuntime();
+#ifdef MTK_ART_RUNTIME_FREED_FIX
+    if (is_vm_shut_down_) {
+      return JNI_ERR;
+    }
+#endif
     runtime->DetachCurrentThread();
     return JNI_OK;
   }
@@ -379,7 +392,11 @@ class JII {
     Runtime* runtime = reinterpret_cast<JavaVMExt*>(vm)->GetRuntime();
 
     // No threads allowed in zygote mode.
+#ifdef MTK_ART_RUNTIME_FREED_FIX
+    if (is_vm_shut_down_ || runtime->IsZygote()) {
+#else
     if (runtime->IsZygote()) {
+#endif
       LOG(ERROR) << "Attempt to attach a thread in the zygote";
       return JNI_ERR;
     }
@@ -409,6 +426,9 @@ class JII {
   }
 };
 
+#ifdef MTK_ART_RUNTIME_FREED_FIX
+bool JII::is_vm_shut_down_ = false;
+#endif
 const JNIInvokeInterface gJniInvokeInterface = {
   nullptr,  // reserved0
   nullptr,  // reserved1
@@ -460,8 +480,14 @@ void JavaVMExt::JniAbort(const char* jni_function_name, const char* msg) {
     os << "\n    from " << PrettyMethod(current_method);
   }
   os << "\n";
+#ifdef CHECK_JNI_HAVE_AEE_FEATURE
+  std::string aee_msg = os.str();
+#endif
   self->Dump(os);
-
+#ifdef CHECK_JNI_HAVE_AEE_FEATURE
+  LOG(ERROR) << os.str();
+  run_aee(current_method, aee_msg);
+#endif
   if (check_jni_abort_hook_ != nullptr) {
     check_jni_abort_hook_(check_jni_abort_hook_data_, os.str());
   } else {

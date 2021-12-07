@@ -41,6 +41,15 @@ extern "C" double fmod(double a, double b);            // REM_DOUBLE[_2ADDR]
 extern "C" float art_quick_fmodf(float a, float b);    // REM_FLOAT[_2ADDR]
 extern "C" double art_quick_fmod(double a, double b);  // REM_DOUBLE[_2ADDR]
 
+#ifdef MTK_ART_COMMON
+extern "C" int32_t artLpow32(int32_t a, int32_t b);
+extern "C" int64_t artLpow64(int64_t a, int64_t b);
+extern "C" double pow(double x, double y);
+extern "C" float powf(float x, float y);
+extern "C" float art_quick_powf(float a, float b);     // POW_FLOAT[_2ADDR]
+extern "C" double art_quick_pow(double a, double b);   // POW_DOUBLW[_2ADDR]
+#endif
+
 // Integer arithmetics.
 extern "C" int __aeabi_idivmod(int32_t, int32_t);  // [DIV|REM]_INT[_2ADDR|_LIT8|_LIT16]
 
@@ -62,18 +71,31 @@ void InitEntryPoints(JniEntryPoints* jpoints, QuickEntryPoints* qpoints) {
   qpoints->pShlLong = art_quick_shl_long;
   qpoints->pShrLong = art_quick_shr_long;
   qpoints->pUshrLong = art_quick_ushr_long;
+#ifdef MTK_ART_COMMON
+  // No soft-float and hard-float in Integer operation.
+  qpoints->pIpow32 = artLpow32;
+  qpoints->pIpow64 = artLpow64;
+#endif
   if (kArm32QuickCodeUseSoftFloat) {
     qpoints->pFmod = fmod;
     qpoints->pFmodf = fmodf;
     qpoints->pD2l = art_d2l;
     qpoints->pF2l = art_f2l;
     qpoints->pL2f = art_l2f;
+#ifdef MTK_ART_COMMON
+    qpoints->pFpow = pow;
+    qpoints->pFpowf = powf;
+#endif
   } else {
     qpoints->pFmod = art_quick_fmod;
     qpoints->pFmodf = art_quick_fmodf;
     qpoints->pD2l = art_quick_d2l;
     qpoints->pF2l = art_quick_f2l;
     qpoints->pL2f = art_quick_l2f;
+#ifdef MTK_ART_COMMON
+    qpoints->pFpow = art_quick_pow;
+    qpoints->pFpowf = art_quick_powf;
+#endif
   }
 
   // More math.

@@ -60,14 +60,26 @@ namespace art {
 static bool CheckType(Primitive::Type type, Location location) {
   if (location.IsFpuRegister()
       || (location.IsUnallocated() && (location.GetPolicy() == Location::kRequiresFpuRegister))) {
+#ifdef MTK_ART_COMMON
+    return (type == Primitive::kPrimFloat) || (type == Primitive::kPrimDouble) || (Primitive::IsVectorType(type));
+#else
     return (type == Primitive::kPrimFloat) || (type == Primitive::kPrimDouble);
+#endif
   } else if (location.IsRegister() ||
              (location.IsUnallocated() && (location.GetPolicy() == Location::kRequiresRegister))) {
+#ifdef MTK_ART_COMMON
+    return Primitive::IsIntegralType(type) || (type == Primitive::kPrimNot) || (Primitive::IsVectorType(type));
+#else
     return Primitive::IsIntegralType(type) || (type == Primitive::kPrimNot);
+#endif
   } else if (location.IsRegisterPair()) {
     return type == Primitive::kPrimLong;
   } else if (location.IsFpuRegisterPair()) {
+#ifdef MTK_ART_COMMON
+    return type == Primitive::kPrimDouble || (Primitive::IsVectorType(type));
+#else
     return type == Primitive::kPrimDouble;
+#endif
   } else if (location.IsStackSlot()) {
     return (Primitive::IsIntegralType(type) && type != Primitive::kPrimLong)
            || (type == Primitive::kPrimFloat)
@@ -230,6 +242,9 @@ void CodeGenerator::Compile(CodeAllocator* allocator) {
     // It is necessary to make stepping over a statement work. Otherwise, any initial
     // instructions (e.g. moves) would be assumed to be the start of next statement.
     MaybeRecordNativeDebugInfo(nullptr /* instruction */, block->GetDexPc());
+#ifdef MTK_ART_COMMON
+    WrapperInit(block);
+#endif
     for (HInstructionIterator it(block->GetInstructions()); !it.Done(); it.Advance()) {
       HInstruction* current = it.Current();
       if (current->HasEnvironment()) {
@@ -242,6 +257,9 @@ void CodeGenerator::Compile(CodeAllocator* allocator) {
       DCHECK(CheckTypeConsistency(current));
       current->Accept(instruction_visitor);
     }
+#ifdef MTK_ART_COMMON
+    WrapperFinalize();
+#endif
   }
 
   GenerateSlowPaths();
@@ -553,6 +571,9 @@ void CodeGenerator::MaybeRecordStat(MethodCompilationStat compilation_stat, size
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 std::unique_ptr<CodeGenerator> CodeGenerator::Create(HGraph* graph,
                                                      InstructionSet instruction_set,
                                                      const InstructionSetFeatures& isa_features,
@@ -691,9 +712,15 @@ static void CheckLoopEntriesCanBeUsedForOsr(const HGraph& graph,
 
 void CodeGenerator::BuildStackMaps(MemoryRegion region, const DexFile::CodeItem& code_item) {
   stack_map_stream_.FillIn(region);
-  if (kIsDebugBuild) {
-    CheckLoopEntriesCanBeUsedForOsr(*graph_, CodeInfo(region), code_item);
+#ifdef MTK_ART_COMMON
+  if (graph_->IsCompilingOsr()) {
+#endif
+    if (kIsDebugBuild) {
+      CheckLoopEntriesCanBeUsedForOsr(*graph_, CodeInfo(region), code_item);
+    }
+#ifdef MTK_ART_COMMON
   }
+#endif
 }
 
 void CodeGenerator::RecordPcInfo(HInstruction* instruction,

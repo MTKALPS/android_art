@@ -25,6 +25,10 @@
 
 namespace art {
 
+#ifdef MTK_ART_COMMON
+// AOSP puts class declaration and definiation all in .cpp,
+// Without any better solution, I place these code to .h.
+#else
 class MonotonicValueRange;
 
 /**
@@ -1741,6 +1745,7 @@ class BCEVisitor : public HGraphVisitor {
 
   DISALLOW_COPY_AND_ASSIGN(BCEVisitor);
 };
+#endif
 
 void BoundsCheckElimination::Run() {
   if (!graph_->HasBoundsChecks()) {

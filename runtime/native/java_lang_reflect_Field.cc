@@ -94,6 +94,9 @@ ALWAYS_INLINE inline static bool GetFieldValue(mirror::Object* o, mirror::Field*
       // Else break to report an error.
       break;
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       // Never okay.
       break;
   }
@@ -293,6 +296,9 @@ ALWAYS_INLINE inline static void SetFieldValue(mirror::Object* o, mirror::Field*
     // Else fall through to report an error.
     FALLTHROUGH_INTENDED;
   case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+  default:
+#endif
     // Never okay.
     ThrowIllegalArgumentException(StringPrintf("Not a primitive field: %s",
                                                PrettyField(f->GetArtField()).c_str()).c_str());

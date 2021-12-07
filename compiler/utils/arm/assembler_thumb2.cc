@@ -3880,5 +3880,85 @@ void Thumb2Assembler::EmitJumpTableDispatch(JumpTable* jump_table, Register disp
   add(PC, PC, ShifterOperand(displacement_reg));
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+void Thumb2Assembler::vdup(VRegister vd, Register rt, Primitive::Type vector_type) {
+  UNUSED(vd);
+  UNUSED(rt);
+  UNUSED(vector_type);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vaddq(VRegister vd, VRegister vn, VRegister vm,
+                            Primitive::Type vector_type) {
+  UNUSED(vd);
+  UNUSED(vn);
+  UNUSED(vm);
+  UNUSED(vector_type);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vaddq(DRegister dd, DRegister dn, DRegister dm) {
+  UNUSED(dd);
+  UNUSED(dn);
+  UNUSED(dm);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vmulq(VRegister vd, VRegister vn, VRegister vm,
+                            Primitive::Type vector_type) {
+  UNUSED(vd);
+  UNUSED(vn);
+  UNUSED(vm);
+  UNUSED(vector_type);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vpaddl(VRegister vd, VRegister vn, Primitive::Type vector_type) {
+  UNUSED(vd);
+  UNUSED(vn);
+  UNUSED(vector_type);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vldm(VRegister vd, const Address& ad,
+                           Primitive::Type vector_type,
+                           Condition cond) {
+  UNUSED(vd);
+  UNUSED(ad);
+  UNUSED(vector_type);
+  UNUSED(cond);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vstm(VRegister vn, const Address& ad,
+                           Primitive::Type vector_type,
+                           Condition cond) {
+  UNUSED(vn);
+  UNUSED(ad);
+  UNUSED(vector_type);
+  UNUSED(cond);
+  LOG(FATAL) << "Unimplmented.";
+}
+
+__attribute__((weak))
+void Thumb2Assembler::vmovvr(VRegister vd, int vd_index, Register rt,
+                             Primitive::Type vector_type, bool r2v, Condition cond) {
+  UNUSED(vd);
+  UNUSED(vd_index);
+  UNUSED(rt);
+  UNUSED(vector_type);
+  UNUSED(r2v);
+  UNUSED(cond);
+  LOG(FATAL) << "Unimplmented.";
+}
+#endif
+
 }  // namespace arm
 }  // namespace art

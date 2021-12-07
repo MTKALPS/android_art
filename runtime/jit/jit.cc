@@ -33,6 +33,10 @@
 #include "thread_list.h"
 #include "utils.h"
 
+#ifdef __ANDROID__
+#include "cutils/properties.h"
+#endif
+
 namespace art {
 namespace jit {
 
@@ -63,6 +67,12 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
       options.GetOrDefault(RuntimeArgumentMap::JITSaveProfilingInfo);
 
   jit_options->compile_threshold_ = options.GetOrDefault(RuntimeArgumentMap::JITCompileThreshold);
+#ifdef __ANDROID__
+  char jit_compile_threshold[PROPERTY_VALUE_MAX];
+  if (property_get("dalvik.vm.jitcompilethreshold", jit_compile_threshold, NULL) > 0) {
+    jit_options->compile_threshold_ = atoi(jit_compile_threshold);
+  }
+#endif
   if (jit_options->compile_threshold_ > std::numeric_limits<uint16_t>::max()) {
     LOG(FATAL) << "Method compilation threshold is above its internal limit.";
   }

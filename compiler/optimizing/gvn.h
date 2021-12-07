@@ -26,16 +26,28 @@ class SideEffectsAnalysis;
 
 class GVNOptimization : public HOptimization {
  public:
+#ifdef MTK_ART_COMMON
+  GVNOptimization(HGraph* graph,
+                  const SideEffectsAnalysis& side_effects,
+                  const char* pass_name = kGlobalValueNumberingPassName,
+                  OptimizingCompilerStats* stats = nullptr)
+      : HOptimization(graph, pass_name, stats), side_effects_(side_effects) {}
+#else
   GVNOptimization(HGraph* graph,
                   const SideEffectsAnalysis& side_effects,
                   const char* pass_name = kGlobalValueNumberingPassName)
       : HOptimization(graph, pass_name), side_effects_(side_effects) {}
+#endif
 
   void Run() OVERRIDE;
 
   static constexpr const char* kGlobalValueNumberingPassName = "GVN";
 
+#ifndef MTK_ART_COMMON
  private:
+#else
+ protected:
+#endif
   const SideEffectsAnalysis& side_effects_;
 
   DISALLOW_COPY_AND_ASSIGN(GVNOptimization);

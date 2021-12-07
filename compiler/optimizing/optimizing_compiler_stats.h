@@ -65,6 +65,26 @@ enum MethodCompilationStat {
   kInlinedInvokeVirtualOrInterface,
   kImplicitNullCheckGenerated,
   kExplicitNullCheckGenerated,
+#if MTK_ART_COMMON
+  kMtkFirstStat,
+  kMtkOptimizingOptStat1,
+  kMtkOptimizingOptStat2,
+  kMtkOptimizingOptStat3,
+  kMtkOptimizingOptStat4,
+  kMtkOptimizingOptStat5,
+  kMtkOptimizingOptStat6,
+  kMtkOptimizingOptStat7,
+  kMtkOptimizingOptStat8,
+  kMtkOptimizingOptStat9,
+  kMtkOptimizingOptStat10,
+  kMtkOptimizingOptStat11,
+  kMtkOptimizingOptStat12,
+  kMtkOptimizingOptStat13,
+  kMtkOptimizingOptStat14,
+  kMtkOptimizingOptStat15,
+  kMtkOptimizingOptStat16,
+  kMtkOptimizingOptStat17,
+#endif
   kLastStat
 };
 
@@ -92,15 +112,26 @@ class OptimizingCompilerStats {
           << compiled_percent << "% (" << compile_stats_[kCompiled] << ") compiled.";
 
       for (int i = 0; i < kLastStat; i++) {
-        if (compile_stats_[i] != 0) {
-          LOG(INFO) << PrintMethodCompilationStat(static_cast<MethodCompilationStat>(i)) << ": "
-              << compile_stats_[i];
+#ifdef MTK_ART_COMMON
+        if (i >= kMtkFirstStat) {
+          PrintMTKMethodCompilationStat(i);
+        } else {
+#endif
+          if (compile_stats_[i] != 0) {
+            LOG(INFO) << PrintMethodCompilationStat(static_cast<MethodCompilationStat>(i)) << ": "
+                << compile_stats_[i];
+          }
+#ifdef MTK_ART_COMMON
         }
+#endif
       }
     }
   }
 
  private:
+#ifdef MTK_ART_COMMON
+  void PrintMTKMethodCompilationStat(int stat) const;
+#endif
   std::string PrintMethodCompilationStat(MethodCompilationStat stat) const {
     std::string name;
     switch (stat) {
@@ -144,7 +175,11 @@ class OptimizingCompilerStats {
       case kImplicitNullCheckGenerated: name = "ImplicitNullCheckGenerated"; break;
       case kExplicitNullCheckGenerated: name = "ExplicitNullCheckGenerated"; break;
 
+      #ifdef MTK_ART_COMMON
+      default:
+      #else
       case kLastStat:
+      #endif
         LOG(FATAL) << "invalid stat "
             << static_cast<std::underlying_type<MethodCompilationStat>::type>(stat);
         UNREACHABLE();

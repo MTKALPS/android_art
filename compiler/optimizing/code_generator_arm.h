@@ -67,6 +67,12 @@ static constexpr DRegister FromLowSToD(SRegister reg) {
       static_cast<DRegister>(reg / 2);
 }
 
+#ifdef MTK_ART_COMMON
+static constexpr VRegister FromLowDToV(DRegister reg) {
+  return DCHECK_CONSTEXPR(reg % 2 == 0, , Q0)
+      static_cast<VRegister>(reg / 2);
+}
+#endif
 
 class InvokeDexCallingConvention : public CallingConvention<Register, SRegister> {
  public:
@@ -161,7 +167,6 @@ class LocationsBuilderARM : public HGraphVisitor {
   FOR_EACH_CONCRETE_INSTRUCTION_COMMON(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_ARM(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_SHARED(DECLARE_VISIT_INSTRUCTION)
-
 #undef DECLARE_VISIT_INSTRUCTION
 
   void VisitInstruction(HInstruction* instruction) OVERRIDE {
@@ -182,6 +187,9 @@ class LocationsBuilderARM : public HGraphVisitor {
   Location ArmEncodableConstantOrRegister(HInstruction* constant, Opcode opcode);
   bool CanEncodeConstantAsImmediate(HConstant* input_cst, Opcode opcode);
   bool CanEncodeConstantAsImmediate(uint32_t value, Opcode opcode);
+#ifdef MTK_ART_COMMON
+  bool SwDivideInstruction(int32_t);
+#endif
 
   CodeGeneratorARM* const codegen_;
   InvokeDexCallingConventionVisitorARM parameter_visitor_;
@@ -287,6 +295,9 @@ class InstructionCodeGeneratorARM : public InstructionCodeGenerator {
   void GenerateDivRemWithAnyConstant(HBinaryOperation* instruction);
   void GenerateDivRemConstantIntegral(HBinaryOperation* instruction);
   void HandleGoto(HInstruction* got, HBasicBlock* successor);
+#ifdef MTK_ART_COMMON
+  bool SwDivideInstruction(int32_t);
+#endif
 
   ArmAssembler* const assembler_;
   CodeGeneratorARM* const codegen_;
@@ -517,6 +528,14 @@ class CodeGeneratorARM : public CodeGenerator {
 
   void GenerateImplicitNullCheck(HNullCheck* instruction);
   void GenerateExplicitNullCheck(HNullCheck* instruction);
+#ifdef MTK_ART_COMMON
+  void SetWrapperOption(CompilerDriver* compiler_driver,
+                        OptimizingCompilerStats* stats) OVERRIDE {
+    compiler_driver_ = compiler_driver;
+    UNUSED(stats);
+  }
+  const CompilerDriver* GetCompilerDriver() OVERRIDE { return compiler_driver_; }
+#endif
 
  private:
   // Factored implementation of GenerateFieldLoadWithBakerReadBarrier
@@ -553,6 +572,9 @@ class CodeGeneratorARM : public CodeGenerator {
   ParallelMoveResolverARM move_resolver_;
   Thumb2Assembler assembler_;
   const ArmInstructionSetFeatures& isa_features_;
+#ifdef MTK_ART_COMMON
+  CompilerDriver* compiler_driver_;
+#endif
 
   // Deduplication map for 32-bit literals, used for non-patchable boot image addresses.
   Uint32ToLiteralMap uint32_literals_;

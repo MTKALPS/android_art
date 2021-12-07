@@ -189,6 +189,10 @@ class ImgDiagDumper {
         oss << "void";
         break;
       }
+#ifdef MTK_ART_COMMON
+     default:
+       UNREACHABLE();
+#endif
     }
     return oss.str();
   }

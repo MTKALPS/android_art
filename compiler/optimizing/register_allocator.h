@@ -99,6 +99,11 @@ class RegisterAllocator {
   // Returns whether `reg` is blocked by the code generator.
   bool IsBlocked(int reg) const;
 
+#ifdef MTK_ART_COMMON
+  // Returns whether `reg` is blocked by the code generator.
+  bool IsBlocked(int reg, bool packed) const;
+#endif
+
   // Update the interval for the register in `location` to cover [start, end).
   void BlockRegister(Location location, size_t start, size_t end);
   void BlockRegisters(size_t start, size_t end, bool caller_save_only = false);
@@ -149,7 +154,11 @@ class RegisterAllocator {
   bool ValidateInternal(bool log_fatal_on_failure) const;
   void DumpInterval(std::ostream& stream, LiveInterval* interval) const;
   void DumpAllIntervals(std::ostream& stream) const;
+#ifdef MTK_ART_COMMON
+  int FindAvailableRegisterPair(size_t* next_use, size_t starting_at, bool packed) const;
+#else
   int FindAvailableRegisterPair(size_t* next_use, size_t starting_at) const;
+#endif
   int FindAvailableRegister(size_t* next_use, LiveInterval* current) const;
   bool IsCallerSaveRegister(int reg) const;
 

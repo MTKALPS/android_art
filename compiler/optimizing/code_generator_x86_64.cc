@@ -2072,6 +2072,10 @@ Location InvokeDexCallingConventionVisitorX86_64::GetReturnLocation(Primitive::T
     case Primitive::kPrimDouble:
     case Primitive::kPrimFloat:
       return Location::FpuRegisterLocation(XMM0);
+#ifdef MTK_ART_COMMON
+    default:
+      UNREACHABLE();
+#endif
   }
 
   UNREACHABLE();
@@ -2131,6 +2135,9 @@ Location InvokeDexCallingConventionVisitorX86_64::GetNextLocation(Primitive::Typ
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unexpected parameter type " << type;
       break;
   }
@@ -4179,6 +4186,9 @@ void InstructionCodeGeneratorX86_64::HandleFieldGet(HInstruction* instruction,
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << field_type;
       UNREACHABLE();
   }
@@ -4341,6 +4351,9 @@ void InstructionCodeGeneratorX86_64::HandleFieldSet(HInstruction* instruction,
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << field_type;
       UNREACHABLE();
   }
@@ -4679,6 +4692,9 @@ void InstructionCodeGeneratorX86_64::VisitArrayGet(HArrayGet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }
@@ -4959,6 +4975,9 @@ void InstructionCodeGeneratorX86_64::VisitArraySet(HArraySet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << instruction->GetType();
       UNREACHABLE();
   }

@@ -1,4 +1,10 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
+#
 # Copyright (C) 2011 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -336,6 +342,87 @@ art_debug_cflags := \
   -DDYNAMIC_ANNOTATIONS_ENABLED=1 \
   -UNDEBUG
 
+#
+# Used to enable/disable MTK ART optimizations
+#
+ifeq ($(MTK_ART_OPT_ENABLE),)
+  MTK_ART_OPT_ENABLE := true
+endif
+
+#
+# MTK ART optimization features
+#
+MTK_CFLAGS :=
+ifeq ($(MTK_ART_OPT_ENABLE),true)
+  ART_HOST_ASFLAGS := -DMTK_ART_COMMON
+  ART_TARGET_ASFLAGS := -DMTK_ART_COMMON
+  MTK_CFLAGS += -DMTK_ART_COMMON
+  MTK_CFLAGS += -DMTK_ARTOPT_VERSION
+
+  # Turn off this in release build
+  # MTK_CFLAGS += -DMTK_ART_LOG
+
+  # Wrapper for debugging
+  MTK_CFLAGS += -DMTK_ART_WRAPPER
+endif
+
+ifeq ($(MTK_ART_RUNTIME_FREED_FIX),)
+  MTK_ART_RUNTIME_FREED_FIX := true
+endif
+
+ifeq ($(MTK_ART_RUNTIME_FREED_FIX),true)
+  MTK_CFLAGS += -DMTK_ART_RUNTIME_FREED_FIX
+endif
+
+ifeq ($(MTK_ART_RUNTIME_FUTEX_USAGE_FIX),)
+  MTK_ART_RUNTIME_FUTEX_USAGE_FIX := true
+endif
+
+ifeq ($(MTK_ART_RUNTIME_FUTEX_USAGE_FIX),true)
+  MTK_CFLAGS += -DMTK_ART_RUNTIME_FUTEX_USAGE_FIX
+endif
+
+# Only enable this config on userdebug/eng builds
+ifneq (,$(filter userdebug eng, $(TARGET_BUILD_VARIANT)))
+  ifeq ($(MTK_ART_RUNTIME_FUTEX_TIMEOUT_ISSUE),)
+    MTK_ART_RUNTIME_FUTEX_TIMEOUT_ISSUE := true
+  endif
+endif
+
+ifeq ($(MTK_ART_RUNTIME_FUTEX_TIMEOUT_ISSUE),true)
+  MTK_CFLAGS += -DMTK_ART_RUNTIME_FUTEX_TIMEOUT_ISSUE
+endif
+
+#
+## MTK fix ART oat_file timing issue
+#
+ifeq ($(MTK_ART_FIX_OAT_FILE_TIMING_ISSUE),)
+  MTK_ART_FIX_OAT_FILE_TIMING_ISSUE := true
+endif
+
+ifeq ($(MTK_ART_FIX_OAT_FILE_TIMING_ISSUE),true)
+  MTK_CFLAGS += -DMTK_ART_FIX_OAT_FILE_TIMING_ISSUE
+endif
+
+#
+# MTK fix ART thread list memory leakage
+#
+ifeq ($(MTK_ART_FIX_THREAD_LIST_MEM_LEAKAGE),)
+  MTK_ART_FIX_THREAD_LIST_MEM_LEAKAGE := true
+endif
+
+ifeq ($(MTK_ART_FIX_THREAD_LIST_MEM_LEAKAGE),true)
+  MTK_CFLAGS += -DMTK_ART_FIX_THREAD_LIST_MEM_LEAKAGE
+endif
+
+ifeq ($(MTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK),)
+  MTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK := true
+endif
+
+ifeq ($(MTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK),true)
+  MTK_CFLAGS += -DMTK_ART_RUNTIME_CLAMP_GROWTH_LIMIT_GC_LOCK
+endif
+
 art_host_non_debug_cflags := $(art_non_debug_cflags)
 art_target_non_debug_cflags := $(art_non_debug_cflags)
 
@@ -347,7 +434,7 @@ ifeq ($(HOST_OS),linux)
       ifdef SANITIZE_TARGET
         art_target_non_debug_cflags += -Wframe-larger-than=6400
       else
-        art_target_non_debug_cflags += -Wframe-larger-than=1728
+        art_target_non_debug_cflags += -Wframe-larger-than=2352
       endif
     endif
   endif
@@ -358,6 +445,7 @@ ifndef LIBART_IMG_HOST_BASE_ADDRESS
 endif
 ART_HOST_CFLAGS += $(art_cflags) -DART_BASE_ADDRESS=$(LIBART_IMG_HOST_BASE_ADDRESS)
 ART_HOST_CFLAGS += -DART_DEFAULT_INSTRUCTION_SET_FEATURES=default $(art_host_cflags)
+ART_HOST_CFLAGS += $(MTK_CFLAGS)
 ART_HOST_ASFLAGS += $(art_asflags)
 
 ifndef LIBART_IMG_TARGET_BASE_ADDRESS
@@ -365,6 +453,7 @@ ifndef LIBART_IMG_TARGET_BASE_ADDRESS
 endif
 ART_TARGET_CFLAGS += $(art_cflags) -DART_TARGET -DART_BASE_ADDRESS=$(LIBART_IMG_TARGET_BASE_ADDRESS)
 ART_TARGET_CFLAGS += $(art_target_cflags)
+ART_TARGET_CFLAGS += $(MTK_CFLAGS)
 ART_TARGET_ASFLAGS += $(art_asflags)
 
 ART_HOST_NON_DEBUG_CFLAGS := $(art_host_non_debug_cflags)

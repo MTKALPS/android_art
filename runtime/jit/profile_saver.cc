@@ -503,9 +503,18 @@ void ProfileSaver::AddTrackedLocations(const std::string& output_filename,
 // only cache the location, and then wake up the saver thread to do the
 // comparisons with the real file paths and to create the markers).
 void ProfileSaver::NotifyDexUse(const std::string& dex_location) {
+#ifdef MTK_ART_FIX_OAT_FILE_TIMING_ISSUE
+{
+  ReaderMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
   if (!ShouldProfileLocation(dex_location)) {
     return;
   }
+}
+#else
+  if (!ShouldProfileLocation(dex_location)) {
+    return;
+  }
+#endif
   std::set<std::string> app_code_paths;
   std::string foreign_dex_profile_path;
   std::set<std::string> app_data_dirs;

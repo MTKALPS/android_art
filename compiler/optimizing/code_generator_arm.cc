@@ -779,6 +779,9 @@ CodeGeneratorARM::CodeGeneratorARM(HGraph* graph,
       move_resolver_(graph->GetArena(), this),
       assembler_(graph->GetArena()),
       isa_features_(isa_features),
+#ifdef MTK_ART_COMMON
+      compiler_driver_(nullptr),
+#endif
       uint32_literals_(std::less<uint32_t>(),
                        graph->GetArena()->Adapter(kArenaAllocCodeGenerator)),
       method_patches_(MethodReferenceComparator(),
@@ -1024,6 +1027,9 @@ Location InvokeDexCallingConventionVisitorARM::GetNextLocation(Primitive::Type t
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unexpected parameter type " << type;
       break;
   }
@@ -1055,6 +1061,14 @@ Location InvokeDexCallingConventionVisitorARM::GetReturnLocation(Primitive::Type
 
     case Primitive::kPrimVoid:
       return Location::NoLocation();
+#ifdef MTK_ART_COMMON
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+      return Location::FpuRegisterPairLocation(D0, D1);
+#endif
   }
 
   UNREACHABLE();
@@ -2478,6 +2492,14 @@ void LocationsBuilderARM::VisitAdd(HAdd* add) {
     }
 
     default:
+#ifdef MTK_ART_COMMON
+      if (Primitive::IsVectorType(add->GetType())) {
+        locations->SetInAt(0, Location::RequiresFpuRegister());
+        locations->SetInAt(1, Location::RequiresFpuRegister());
+        locations->SetOut(Location::RequiresFpuRegister(), Location::kNoOutputOverlap);
+        break;
+      }
+#endif
       LOG(FATAL) << "Unexpected add type " << add->GetResultType();
   }
 }
@@ -2524,6 +2546,15 @@ void InstructionCodeGeneratorARM::VisitAdd(HAdd* add) {
       break;
 
     default:
+#ifdef MTK_ART_COMMON
+      if (Primitive::IsVectorType(add->GetType())) {
+        __ vaddq(FromLowDToV(out.AsFpuRegisterPairLow<DRegister>()),
+                 FromLowDToV(first.AsFpuRegisterPairLow<DRegister>()),
+                 FromLowDToV(second.AsFpuRegisterPairLow<DRegister>()),
+                 add->GetType());
+        break;
+      }
+#endif
       LOG(FATAL) << "Unexpected add type " << add->GetResultType();
   }
 }
@@ -2607,6 +2638,148 @@ void InstructionCodeGeneratorARM::VisitSub(HSub* sub) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+void LocationsBuilderARM::VisitMla(HMla* mla) {
+  LocationSummary* locations = new (GetGraph()->GetArena()) LocationSummary(mla, LocationSummary::kNoCall);
+  switch (mla->GetResultType()) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong:  {
+      locations->SetInAt(0, Location::RequiresRegister());
+      locations->SetInAt(1, Location::RequiresRegister());
+      locations->SetInAt(2, Location::RequiresRegister());
+      locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
+      break;
+    }
+
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble: {
+      locations->SetInAt(0, Location::RequiresFpuRegister());
+      locations->SetInAt(1, Location::RequiresFpuRegister());
+      locations->SetInAt(2, Location::RequiresFpuRegister());
+      locations->SetOut(locations->InAt(2), Location::kOutputOverlap);
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected mla type " << mla->GetResultType();
+  }
+}
+
+void InstructionCodeGeneratorARM::VisitMla(HMla* mla) {
+  LocationSummary* locations = mla->GetLocations();
+  Location out = locations->Out();
+  Location first = locations->InAt(0);
+  Location second = locations->InAt(1);
+  Location third = locations->InAt(2);
+  switch (mla->GetResultType()) {
+    case Primitive::kPrimInt: {
+      __ mla(out.AsRegister<Register>(),
+             first.AsRegister<Register>(),
+             second.AsRegister<Register>(),
+             third.AsRegister<Register>());
+      break;
+    }
+    case Primitive::kPrimLong: {
+      Register out_hi = out.AsRegisterPairHigh<Register>();
+      Register out_lo = out.AsRegisterPairLow<Register>();
+      Register in1_hi = first.AsRegisterPairHigh<Register>();
+      Register in1_lo = first.AsRegisterPairLow<Register>();
+      Register in2_hi = second.AsRegisterPairHigh<Register>();
+      Register in2_lo = second.AsRegisterPairLow<Register>();
+      Register in3_hi = third.AsRegisterPairHigh<Register>();
+      Register in3_lo = third.AsRegisterPairLow<Register>();
+
+      // Extra checks to protect caused by the existence of R1_R2.
+      // The algorithm is wrong if out.hi is either in1.lo or in2.lo:
+      // (e.g. in1=r0_r1, in2=r2_r3 and out=r1_r2);
+      DCHECK_NE(out_hi, in1_lo);
+      DCHECK_NE(out_hi, in2_lo);
+
+      // input: in1 - 64 bits, in2 - 64 bits
+      // output: out
+      // formula: out.hi : out.lo = (in1.lo * in2.hi + in1.hi * in2.lo)* 2^32 + in1.lo * in2.lo
+      // parts: out.hi = in1.lo * in2.hi + in1.hi * in2.lo + (in1.lo * in2.lo)[63:32]
+      // parts: out.lo = (in1.lo * in2.lo)[31:0]
+
+      // IP <- in1.lo * in2.hi
+      __ mul(IP, in1_lo, in2_hi);
+      // out.hi <- in1.lo * in2.hi + in1.hi * in2.lo
+      __ mla(out_hi, in1_hi, in2_lo, IP);
+      // out.lo <- (in1.lo * in2.lo)[31:0];
+      __ umull(out_lo, IP, in1_lo, in2_lo);
+      // out.hi <- in2.hi * in1.lo +  in2.lo * in1.hi + (in1.lo * in2.lo)[63:32]
+      __ add(out_hi, out_hi, ShifterOperand(IP));
+
+      __ adds(out_lo, out_lo, ShifterOperand(in3_lo));
+      __ adc(out_hi, out_hi, ShifterOperand(in3_hi));
+      break;
+    }
+
+    case Primitive::kPrimFloat: {
+      __ vmlas(third.AsFpuRegister<SRegister>(),
+               first.AsFpuRegister<SRegister>(),
+               second.AsFpuRegister<SRegister>());
+      __ vmovs(out.AsFpuRegister<SRegister>(), third.AsFpuRegister<SRegister>());
+      break;
+    }
+
+    case Primitive::kPrimDouble: {
+      __ vmlad(FromLowSToD(third.AsFpuRegisterPairLow<SRegister>()),
+               FromLowSToD(first.AsFpuRegisterPairLow<SRegister>()),
+               FromLowSToD(second.AsFpuRegisterPairLow<SRegister>()));
+      __ vmovd(FromLowSToD(out.AsFpuRegister<SRegister>()), FromLowSToD(third.AsFpuRegister<SRegister>()));
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected mul type " << mla->GetResultType();
+  }
+}
+
+__attribute__((weak))
+void LocationsBuilderARM::VisitVectorSplat(HVectorSplat* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM::VisitVectorSplat(HVectorSplat* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM::VisitAddReduce(HAddReduce* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM::VisitAddReduce(HAddReduce* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM::VisitGetElementPtr(HGetElementPtr* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM::VisitGetElementPtr(HGetElementPtr* instruction) {
+  UNUSED(instruction);
+}
+
+__attribute__((weak))
+void InstructionCodeGeneratorARM::VisitConstantVector(HConstantVector* instr) {
+  UNUSED(instr);
+}
+
+__attribute__((weak))
+void LocationsBuilderARM::VisitConstantVector(HConstantVector* instr) {
+  UNUSED(instr);
+}
+#endif
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void LocationsBuilderARM::VisitMul(HMul* mul) {
   LocationSummary* locations =
       new (GetGraph()->GetArena()) LocationSummary(mul, LocationSummary::kNoCall);
@@ -2632,6 +2805,9 @@ void LocationsBuilderARM::VisitMul(HMul* mul) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM::VisitMul(HMul* mul) {
   LocationSummary* locations = mul->GetLocations();
   Location out = locations->Out();
@@ -2819,7 +2995,12 @@ void LocationsBuilderARM::VisitDiv(HDiv* div) {
   if (div->GetResultType() == Primitive::kPrimLong) {
     // pLdiv runtime call.
     call_kind = LocationSummary::kCall;
+#ifdef MTK_ART_COMMON
+  } else if (div->GetResultType() == Primitive::kPrimInt && div->InputAt(1)->IsConstant() &&
+             SwDivideInstruction(div->InputAt(1)->AsIntConstant()->GetValue())) {
+#else
   } else if (div->GetResultType() == Primitive::kPrimInt && div->InputAt(1)->IsConstant()) {
+#endif
     // sdiv will be replaced by other instruction sequence.
   } else if (div->GetResultType() == Primitive::kPrimInt &&
              !codegen_->GetInstructionSetFeatures().HasDivideInstruction()) {
@@ -2831,7 +3012,12 @@ void LocationsBuilderARM::VisitDiv(HDiv* div) {
 
   switch (div->GetResultType()) {
     case Primitive::kPrimInt: {
+#ifdef MTK_ART_COMMON
+      if (div->InputAt(1)->IsConstant() &&
+          SwDivideInstruction(div->InputAt(1)->AsIntConstant()->GetValue())) {
+#else
       if (div->InputAt(1)->IsConstant()) {
+#endif
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::ConstantLocation(div->InputAt(1)->AsConstant()));
         locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
@@ -2888,7 +3074,12 @@ void InstructionCodeGeneratorARM::VisitDiv(HDiv* div) {
 
   switch (div->GetResultType()) {
     case Primitive::kPrimInt: {
+#ifdef MTK_ART_COMMON
+      if (second.IsConstant() &&
+          SwDivideInstruction(second.GetConstant()->AsIntConstant()->GetValue())) {
+#else
       if (second.IsConstant()) {
+#endif
         GenerateDivRemConstantIntegral(div);
       } else if (codegen_->GetInstructionSetFeatures().HasDivideInstruction()) {
         __ sdiv(out.AsRegister<Register>(),
@@ -2944,7 +3135,12 @@ void LocationsBuilderARM::VisitRem(HRem* rem) {
 
   // Most remainders are implemented in the runtime.
   LocationSummary::CallKind call_kind = LocationSummary::kCall;
+#ifdef MTK_ART_COMMON
+  if (rem->GetResultType() == Primitive::kPrimInt && rem->InputAt(1)->IsConstant() &&
+      SwDivideInstruction(rem->InputAt(1)->AsIntConstant()->GetValue())) {
+#else
   if (rem->GetResultType() == Primitive::kPrimInt && rem->InputAt(1)->IsConstant()) {
+#endif
     // sdiv will be replaced by other instruction sequence.
     call_kind = LocationSummary::kNoCall;
   } else if ((rem->GetResultType() == Primitive::kPrimInt)
@@ -2957,7 +3153,12 @@ void LocationsBuilderARM::VisitRem(HRem* rem) {
 
   switch (type) {
     case Primitive::kPrimInt: {
+#ifdef MTK_ART_COMMON
+      if (rem->InputAt(1)->IsConstant() &&
+          SwDivideInstruction(rem->InputAt(1)->AsIntConstant()->GetValue())) {
+#else
       if (rem->InputAt(1)->IsConstant()) {
+#endif
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::ConstantLocation(rem->InputAt(1)->AsConstant()));
         locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
@@ -3027,7 +3228,12 @@ void InstructionCodeGeneratorARM::VisitRem(HRem* rem) {
   Primitive::Type type = rem->GetResultType();
   switch (type) {
     case Primitive::kPrimInt: {
+#ifdef MTK_ART_COMMON
+        if (second.IsConstant() &&
+            SwDivideInstruction(second.GetConstant()->AsIntConstant()->GetValue())) {
+#else
         if (second.IsConstant()) {
+#endif
           GenerateDivRemConstantIntegral(rem);
         } else if (codegen_->GetInstructionSetFeatures().HasDivideInstruction()) {
         Register reg1 = first.AsRegister<Register>();
@@ -3899,6 +4105,9 @@ void InstructionCodeGeneratorARM::HandleFieldSet(HInstruction* instruction,
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << field_type;
       UNREACHABLE();
   }
@@ -4095,6 +4304,9 @@ void InstructionCodeGeneratorARM::HandleFieldGet(HInstruction* instruction,
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << field_type;
       UNREACHABLE();
   }
@@ -4251,6 +4463,101 @@ void InstructionCodeGeneratorARM::VisitNullCheck(HNullCheck* instruction) {
   codegen_->GenerateNullCheck(instruction);
 }
 
+#ifdef MTK_ART_COMMON
+void LocationsBuilderARM::VisitPow(HPow* pow) {
+  Primitive::Type type = pow->GetResultType();
+  LocationSummary::CallKind call_kind = LocationSummary::kCall;
+  LocationSummary* locations = new (GetGraph()->GetArena()) LocationSummary(pow, call_kind);
+
+  switch (type) {
+    case Primitive::kPrimInt: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, Location::RegisterLocation(calling_convention.GetRegisterAt(0)));
+      locations->SetInAt(1, Location::RegisterLocation(calling_convention.GetRegisterAt(1)));
+      locations->SetOut(Location::RegisterLocation(R0));
+      break;
+    }
+
+    case Primitive::kPrimLong: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, Location::RegisterPairLocation(
+          calling_convention.GetRegisterAt(0), calling_convention.GetRegisterAt(1)));
+      locations->SetInAt(1, Location::RegisterPairLocation(
+          calling_convention.GetRegisterAt(2), calling_convention.GetRegisterAt(3)));
+      locations->SetOut(Location::RegisterPairLocation(R0, R1));
+      break;
+    }
+
+    case Primitive::kPrimFloat: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, Location::FpuRegisterLocation(calling_convention.GetFpuRegisterAt(0)));
+      locations->SetInAt(1, Location::FpuRegisterLocation(calling_convention.GetFpuRegisterAt(1)));
+      locations->SetOut(Location::FpuRegisterLocation(S0));
+      break;
+    }
+
+    case Primitive::kPrimDouble: {
+      InvokeRuntimeCallingConvention calling_convention;
+      locations->SetInAt(0, Location::FpuRegisterPairLocation(
+          calling_convention.GetFpuRegisterAt(0), calling_convention.GetFpuRegisterAt(1)));
+      locations->SetInAt(1, Location::FpuRegisterPairLocation(
+          calling_convention.GetFpuRegisterAt(2), calling_convention.GetFpuRegisterAt(3)));
+      locations->SetOut(Location::Location::FpuRegisterPairLocation(S0, S1));
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected pow type " << type;
+  }
+}
+
+void InstructionCodeGeneratorARM::VisitPow(HPow* pow) {
+  Primitive::Type type = pow->GetResultType();
+  switch (type) {
+    case Primitive::kPrimInt:
+    case Primitive::kPrimLong: {
+      int32_t entry_offset = (type == Primitive::kPrimInt) ? QUICK_ENTRY_POINT(pIpow32)
+                                                           : QUICK_ENTRY_POINT(pIpow64);
+      codegen_->InvokeRuntime(entry_offset, pow, pow->GetDexPc(), nullptr);
+      break;
+    }
+    case Primitive::kPrimFloat:
+    case Primitive::kPrimDouble: {
+      int32_t entry_offset = (type == Primitive::kPrimFloat) ? QUICK_ENTRY_POINT(pFpowf)
+                                                             : QUICK_ENTRY_POINT(pFpow);
+      codegen_->InvokeRuntime(entry_offset, pow, pow->GetDexPc(), nullptr);
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected pow type " << type;
+  }
+}
+
+void LocationsBuilderARM::VisitZeroBranch(HZeroBranch* instruction) {
+  LocationSummary* locations =
+      new (GetGraph()->GetArena()) LocationSummary(instruction, LocationSummary::kNoCall);
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (instruction->HasUses()) {
+    locations->SetOut(Location::SameAsFirstInput());
+  }
+}
+
+void InstructionCodeGeneratorARM::VisitZeroBranch(HZeroBranch* instruction) {
+  LocationSummary* locations = instruction->GetLocations();
+  Location obj = locations->InAt(0);
+
+  Label* true_target = codegen_->GetLabelOf(instruction->IfTrueSuccessor());
+
+  __ cmp(obj.AsRegister<Register>(), ShifterOperand(0));
+  __ b(true_target, EQ);
+}
+
+#endif
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void LocationsBuilderARM::VisitArrayGet(HArrayGet* instruction) {
   bool object_array_get_with_read_barrier =
       kEmitCompilerReadBarrier && (instruction->GetType() == Primitive::kPrimNot);
@@ -4278,6 +4585,9 @@ void LocationsBuilderARM::VisitArrayGet(HArrayGet* instruction) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM::VisitArrayGet(HArrayGet* instruction) {
   LocationSummary* locations = instruction->GetLocations();
   Location obj_loc = locations->InAt(0);
@@ -4435,6 +4745,9 @@ void InstructionCodeGeneratorARM::VisitArrayGet(HArrayGet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }
@@ -4447,6 +4760,9 @@ void InstructionCodeGeneratorARM::VisitArrayGet(HArrayGet* instruction) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void LocationsBuilderARM::VisitArraySet(HArraySet* instruction) {
   Primitive::Type value_type = instruction->GetComponentType();
 
@@ -4476,6 +4792,9 @@ void LocationsBuilderARM::VisitArraySet(HArraySet* instruction) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void InstructionCodeGeneratorARM::VisitArraySet(HArraySet* instruction) {
   LocationSummary* locations = instruction->GetLocations();
   Location array_loc = locations->InAt(0);
@@ -4725,6 +5044,9 @@ void InstructionCodeGeneratorARM::VisitArraySet(HArraySet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << value_type;
       UNREACHABLE();
   }

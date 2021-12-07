@@ -68,6 +68,9 @@ void HInliner::Run() {
     // doing some logic in the runtime to discover if a method could have been inlined.
     return;
   }
+#ifdef MTK_ART_COMMON
+  graph_->InitRecordStat(kMtkOptimizingOptStat3);
+#endif
   const ArenaVector<HBasicBlock*>& blocks = graph_->GetReversePostOrder();
   DCHECK(!blocks.empty());
   HBasicBlock* next_block = blocks[0];
@@ -83,7 +86,11 @@ void HInliner::Run() {
       HInstruction* next = instruction->GetNext();
       HInvoke* call = instruction->AsInvoke();
       // As long as the call is not intrinsified, it is worth trying to inline.
+#ifdef MTK_ART_COMMON
+      if (call != nullptr && call->GetIntrinsic() == Intrinsics::kNone && !call->IsStopInline()) {
+#else
       if (call != nullptr && call->GetIntrinsic() == Intrinsics::kNone) {
+#endif
         // We use the original invoke type to ensure the resolution of the called method
         // works properly.
         if (!TryInline(call)) {
@@ -105,6 +112,10 @@ void HInliner::Run() {
       instruction = next;
     }
   }
+#ifdef MTK_ART_COMMON
+  int32_t opted = graph_->GetRecordStat(kMtkOptimizingOptStat3);
+  MaybeRecordStat(kMtkOptimizingOptStat3, opted);
+#endif
 }
 
 static bool IsMethodOrDeclaringClassFinal(ArtMethod* method)
@@ -1025,6 +1036,9 @@ HInstanceFieldSet* HInliner::CreateInstanceFieldSet(Handle<mirror::DexCache> dex
   return iput;
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
                                        ArtMethod* resolved_method,
                                        bool same_dex_file,

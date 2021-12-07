@@ -76,6 +76,44 @@ static inline vixl::Register InputRegisterAt(HInstruction* instr, int input_inde
                       instr->InputAt(input_index)->GetType());
 }
 
+#ifdef MTK_ART_COMMON
+static inline vixl::VRegister OutputVRegister(HInstruction* instr) {
+  Location loc = instr->GetLocations()->Out();
+  switch (instr->GetType()) {
+    case Primitive::kVectorInt8x16:
+      return (vixl::VRegister::VRegFromCode(loc.reg())).V16B();
+    case Primitive::kVectorInt16x8:
+      return (vixl::VRegister::VRegFromCode(loc.reg())).V8H();
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorFloatx4:
+      return (vixl::VRegister::VRegFromCode(loc.reg())).V4S();
+    case Primitive::kVectorDoublex2:
+      return (vixl::VRegister::VRegFromCode(loc.reg())).V2D();
+    default:
+      LOG(FATAL) << "Unexpected input vector type " << instr->GetType();
+      UNREACHABLE();
+  }
+}
+
+static inline vixl::VRegister InputVRegisterAt(HInstruction* instr, int index) {
+  HInstruction* input = instr->InputAt(index);
+  switch (input->GetType()) {
+    case Primitive::kVectorInt8x16:
+      return vixl::VRegister::VRegFromCode(instr->GetLocations()->InAt(index).reg()).V16B();
+    case Primitive::kVectorInt16x8:
+      return vixl::VRegister::VRegFromCode(instr->GetLocations()->InAt(index).reg()).V8H();
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorFloatx4:
+      return vixl::VRegister::VRegFromCode(instr->GetLocations()->InAt(index).reg()).V4S();
+    case Primitive::kVectorDoublex2:
+      return vixl::VRegister::VRegFromCode(instr->GetLocations()->InAt(index).reg()).V2D();
+    default:
+      LOG(FATAL) << "Unexpected input vector type " << input->GetType();
+      UNREACHABLE();
+  }
+}
+#endif
+
 static inline vixl::FPRegister DRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
   return vixl::FPRegister::DRegFromCode(location.reg());
@@ -86,9 +124,30 @@ static inline vixl::FPRegister SRegisterFrom(Location location) {
   return vixl::FPRegister::SRegFromCode(location.reg());
 }
 
+#ifdef MTK_ART_COMMON
+static inline vixl::FPRegister QRegisterFrom(Location location) {
+  DCHECK(location.IsFpuRegister());
+  return vixl::FPRegister::QRegFromCode(location.reg());
+}
+#endif
+
 static inline vixl::FPRegister FPRegisterFrom(Location location, Primitive::Type type) {
+#ifdef MTK_ART_COMMON
+  switch (type) {
+    case Primitive::kPrimDouble:
+      return DRegisterFrom(location);
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+      return QRegisterFrom(location);
+    default:
+      return SRegisterFrom(location);
+  }
+#else
   DCHECK(Primitive::IsFloatingPointType(type)) << type;
   return type == Primitive::kPrimDouble ? DRegisterFrom(location) : SRegisterFrom(location);
+#endif
 }
 
 static inline vixl::FPRegister OutputFPRegister(HInstruction* instr) {
@@ -164,6 +223,14 @@ static inline vixl::MemOperand HeapOperand(const vixl::Register& base,
 static inline vixl::MemOperand HeapOperand(const vixl::Register& base, Offset offset) {
   return HeapOperand(base, offset.SizeValue());
 }
+
+#ifdef MTK_ART_COMMON
+static inline vixl::MemOperand HeapOperand(const vixl::Register& base,
+                                           size_t offset,
+                                           vixl::AddrMode addrmode) {
+  return vixl::MemOperand(base.X(), offset, addrmode);
+}
+#endif
 
 static inline vixl::MemOperand HeapOperandFrom(Location location, Offset offset) {
   return HeapOperand(RegisterFrom(location, Primitive::kPrimNot), offset);

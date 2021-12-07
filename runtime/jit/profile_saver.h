@@ -44,7 +44,12 @@ class ProfileSaver {
   // Returns true if the profile saver is started.
   static bool IsStarted() REQUIRES(!Locks::profiler_lock_);
 
+#ifdef MTK_ART_FIX_OAT_FILE_TIMING_ISSUE
+  static void NotifyDexUse(const std::string& dex_location)
+      REQUIRES(!Locks::oat_file_manager_lock_);
+#else
   static void NotifyDexUse(const std::string& dex_location);
+#endif
 
   // If the profile saver is running, dumps statistics to the `os`. Otherwise it does nothing.
   static void DumpInstanceInfo(std::ostream& os);

@@ -1,4 +1,9 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
 # Copyright (C) 2011 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -273,6 +278,11 @@ LIBART_TARGET_SRC_FILES_arm64 := \
   arch/arm64/thread_arm64.cc \
   monitor_pool.cc \
   arch/arm64/fault_handler_arm64.cc
+
+ifeq ($(MTK_ART_OPT_ENABLE),true)
+LIBART_TARGET_SRC_FILES_arm += \
+  arch/arm/quick_entrypoints_arm_mtk.S
+endif
 
 LIBART_SRC_FILES_x86 := \
   interpreter/mterp/mterp.cc \
@@ -574,6 +584,21 @@ endif
   endif
   LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_build.mk
   LOCAL_ADDITIONAL_DEPENDENCIES += $$(LOCAL_PATH)/Android.mk
+  ifeq ($$(art_target_or_host),target)
+    ifeq ($(HAVE_AEE_FEATURE),yes)
+      LOCAL_SHARED_LIBRARIES += libaed
+      LOCAL_C_INCLUDES += $(MTK_PATH_SOURCE)/external/aee/binary/inc
+      LOCAL_CFLAGS += -DCHECK_JNI_HAVE_AEE_FEATURE
+    endif
+  endif
+
+  ifeq ($(MTK_ART_OPT_ENABLE),true)
+    ifeq ($$(art_ndebug_or_debug),debug)
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art-runtimed
+    else
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art-runtime
+    endif
+  endif
 
   ifeq ($$(art_target_or_host),target)
     LOCAL_MODULE_TARGET_ARCH := $$(ART_TARGET_SUPPORTED_ARCH)

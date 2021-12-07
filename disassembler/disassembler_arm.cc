@@ -1059,9 +1059,92 @@ size_t DisassemblerArm::DumpThumb32(std::ostream& os, const uint8_t* instr_ptr) 
               }
             } else if (coproc == 11 && (op3 & 0x9) != 8) {
               // VMOV (ARM core register to scalar or vice versa; 8/16/32-bit)
+#ifdef MTK_ART_COMMON
+              if ((op3 & 0x8) == 0) {  // vmov
+                uint8_t B22 = ((instr >> 20) & 0x4) ? 1 : 0;
+                uint8_t B21 = ((instr >> 20) & 0x2) ? 1 : 0;
+                uint8_t B20 = ((instr >> 20) & 0x1);
+                uint8_t B6 = ((instr >> 4) & 0x4) ? 1 : 0;
+                uint8_t B5 = ((instr >> 4) & 0x2) ? 1 : 0;
+                int index = 0;
+                if (B22 == 1) {
+                  index = (B21 << 2) | ((instr >> 4) & 0x6);
+                } else if (B5 == 1) {
+                  index = (B21 << 2) | B6;
+                } else if (B6 == 0) {
+                  index = B21;
+                } else {
+                  opcode << "UNDEFINED";
+                  break;
+                }
+                ArmRegister Rt(instr, 12);
+                FpRegister d(instr, 16, 7, 1);
+                opcode << "vmov.32";
+                if (B20) {  // r <- Q
+                  args << Rt << ", ";
+                  args << d << "[" << index << "]";
+                } else {
+                  args << d << "[" << index << "], ";
+                  args << Rt;
+                }
+              }
+            } else if (coproc == 0xB && (op3 & 0x9) == 8) {  // vdup
+              uint32_t op = (instr >> 6) & 0x1;
+              uint32_t B = (instr >> 22) & 0x1;
+              uint32_t Q = (instr >> 21) & 0x1;
+              uint32_t E = (instr >> 5) & 0x1;
+              if (op == 0 && Q == 1) {
+                ArmRegister Rt(instr, 12);
+                FpRegister d(instr, 16, 7, 1);
+                int vn_index = d.r >> 1;
+                if (B == 0 && E == 0) {
+                  opcode << "vdup.32";
+                } else if (B == 0 && E == 1) {
+                  opcode << "vdup.16";
+                } else if (B == 1 && E == 0) {
+                  opcode << "vdup.8";
+                } else {
+                  opcode << "UNDEFINED";
+                }
+                args << "q" << vn_index << ", ";
+                args << Rt;
+              }
+#endif
+            }
+          }  // 10xxxx, op = 1
+#ifdef MTK_ART_COMMON
+        } else if (((op3 >> 3) == 6)) {
+          bool Q = ((instr >> 6) & 0x1) == 1;
+          FpRegister d(instr, 12, 22, 1);
+          FpRegister n(instr, 16, 7, 1);
+          FpRegister m(instr, 0, 5, 1);
+          if (coproc == 0xD || coproc == 0x8 || coproc == 0x9) {
+            if (coproc == 0xD) {  // vadd (float)
+              uint32_t sz = (instr >> 20) & 0x1;
+              opcode << ((sz == 1) ? "UNDEFINED" : "vadd.f32");
+            } else {  // vadd, vmul
+              uint32_t op = (instr >> 4) & 0x1;  // 0:add, 1:mul
+              uint32_t size = (instr >> 20) & 0x3;
+              if (size == 0) {
+                opcode << (op == 0 ? "vadd.i8" : "vmul.i8");
+              } else if (size == 1) {
+                opcode << (op == 0 ? "vadd.i16" : "vmul.i16");
+              } else if (size == 2) {
+                opcode << (op == 0 ? "vadd.i32" : "vmul.i32");
+              } else {
+                opcode << (op == 0 ? "vadd.i64" : "vmul.i64");
+              }
+            }
+            if (Q) {
+              args << "q" << (d.r >> 1) << ", "
+                   << "q" << (n.r >> 1) << ", "
+                   << "q" << (m.r >> 1);
+            } else {
+              args << d << "," << n  << ", " << m;
             }
           }
-        }
+#endif
+        }  // coproc end
       }
       break;
     case 2:
@@ -1572,6 +1655,42 @@ size_t DisassemblerArm::DumpThumb32(std::ostream& os, const uint8_t* instr_ptr) 
           case 6:
             break;      // TODO: when we generate these...
           }
+#ifdef MTK_ART_COMMON
+        } else if (((op2 & 0x7A) == 0x70) && (((instr >> 6) & 0x1) == 1)) {
+          uint32_t coproc = (instr >> 8) & 0xF;
+          uint32_t op = ((instr >> 4) & 0x1);
+          if (coproc == 0xD && op == 1) {
+            FpRegister d(instr, 12, 22, 1);
+            FpRegister n(instr, 16, 7, 1);
+            FpRegister m(instr, 0, 5, 1);
+            uint32_t sz = (instr >> 20) & 0x1;
+            if (sz == 1) {
+              opcode << "UNDEFINED";
+            } else {
+              opcode << "vmul.f32";
+              args << "q" << (d.r >> 1) << ", "
+                   << "q" << (n.r >> 1) << ", "
+                   << "q" << (m.r >> 1);
+            }
+          }
+        } else if (((op2 & 0x7B) == 0x7B) && (((instr >> 6) & 0x1) == 1)) {
+          uint32_t coproc = (instr >> 8) & 0xF;
+          uint32_t zero_bits = ((instr >> 16) & 0x3) |
+                               ((instr >> 4) & 0x1);
+          uint32_t op = (instr >> 7) & 0x1;
+          if (coproc == 2 && zero_bits == 0) {
+            FpRegister d(instr, 12, 22, 1);
+            FpRegister m(instr, 0, 5, 1);
+            uint32_t size = (instr >> 18) & 0x3;
+            if (size > 2) {
+              opcode << "UNDEFINED";
+            } else {
+              opcode << "vpaddl." << ((op == 0) ? "s" : "u") << 8 * (1 << size);
+              args << "q" << (d.r >> 1) << ", "
+                   << "q" << (m.r >> 1) << ", ";
+            }
+          }
+#endif
         }
       }
       break;

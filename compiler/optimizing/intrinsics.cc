@@ -509,6 +509,10 @@ static Intrinsics GetIntrinsic(InlineMethod method) {
     // String init cases, not intrinsics.
 
     case kInlineStringInit:
+    #ifdef MTK_ART_COMMON
+    case kInlineOpSecret:
+    case kInlineOpBlindGut:
+    #endif
       return Intrinsics::kNone;
 
     // No default case to make the compiler warn on missing cases.

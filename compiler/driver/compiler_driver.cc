@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -383,6 +388,9 @@ CompilerDriver::CompilerDriver(
       compiled_methods_lock_("compiled method lock"),
       compiled_methods_(MethodTable::key_compare()),
       non_relative_linker_patch_count_(0u),
+#ifdef MTK_ART_COMMON
+      method_stat_lock_("method stat lock"),
+#endif
       boot_image_(boot_image),
       app_image_(app_image),
       image_classes_(image_classes),
@@ -414,6 +422,10 @@ CompilerDriver::CompilerDriver(
   if (boot_image_) {
     CHECK(image_classes_.get() != nullptr) << "Expected image classes for boot image";
   }
+
+  #ifdef MTK_ART_COMMON
+  SetDefaultCompilerArgs();
+  #endif
 }
 
 CompilerDriver::~CompilerDriver() {
@@ -484,6 +496,9 @@ void CompilerDriver::CompileAll(jobject class_loader,
   // 1) Compile all classes and methods enabled for compilation. May fall back to dex-to-dex
   //    compilation.
   if (!GetCompilerOptions().VerifyAtRuntime()) {
+#ifdef MTK_ART_COMMON
+    IPO_Analysis(class_loader, dex_files, timings);
+#endif
     Compile(class_loader, dex_files, timings);
   }
   if (dump_stats_) {
@@ -2914,5 +2929,68 @@ void CompilerDriver::FreeThreadPools() {
   parallel_thread_pool_.reset();
   single_thread_pool_.reset();
 }
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+void CompilerDriver::SetDefaultCompilerArgs() {
+  return;
+}
+__attribute__((weak))
+void CompilerDriver::SetCompilerArgs(std::string compiler_args ATTRIBUTE_UNUSED)  {
+  return;
+}
+
+__attribute__((weak))
+CompilerDriver* GetCompilerDriver(const CompilerOptions* compiler_options,
+                                  VerificationResults* verification_results,
+                                  DexFileToMethodInlinerMap* method_inliner_map,
+                                  Compiler::Kind compiler_kind,
+                                  InstructionSet instruction_set,
+                                  const InstructionSetFeatures* instruction_set_features,
+                                  bool boot_image,
+                                  bool app_image,
+                                  std::unordered_set<std::string>* image_classes,
+                                  std::unordered_set<std::string>* compiled_classes,
+                                  std::unordered_set<std::string>* compiled_methods,
+                                  size_t thread_count,
+                                  bool dump_stats,
+                                  bool dump_passes,
+                                  CumulativeLogger* timer,
+                                  int swap_fd,
+                                  const ProfileCompilationInfo* profile_compilation_info) {
+  return new CompilerDriver(compiler_options,
+                            verification_results,
+                            method_inliner_map,
+                            compiler_kind,
+                            instruction_set,
+                            instruction_set_features,
+                            boot_image,
+                            app_image,
+                            image_classes,
+                            compiled_classes,
+                            compiled_methods,
+                            thread_count,
+                            dump_stats,
+                            dump_passes,
+                            timer,
+                            swap_fd,
+                            profile_compilation_info);
+}
+
+void CompilerDriver::SetMethodCalledInLoop(uint32_t method_idx, uint32_t checksum) {
+  MutexLock mu(Thread::Current(), method_stat_lock_);
+  method_called_in_loop_.push_back(std::pair<uint32_t, uint32_t>(method_idx, checksum));
+}
+
+bool CompilerDriver::IsMethodCalledInNestedLoop(uint32_t method_idx, uint32_t checksum) const {
+  MutexLock mu(Thread::Current(), method_stat_lock_);
+  for (auto it = method_called_in_loop_.begin(); it != method_called_in_loop_.end(); ++it) {
+    if (method_idx == it->first && checksum == it->second) {
+      return true;
+    }
+  }
+  return false;
+}
+#endif
 
 }  // namespace art

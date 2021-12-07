@@ -128,7 +128,11 @@ ADD_TEST_EQ(THREAD_SELF_OFFSET,
             art::Thread::SelfOffset<__SIZEOF_POINTER__>().Int32Value())
 
 // Offset of field Thread::tlsPtr_.thread_local_objects.
+#ifdef MTK_ART_COMMON
+#define THREAD_LOCAL_OBJECTS_OFFSET (THREAD_CARD_TABLE_OFFSET + 172 * __SIZEOF_POINTER__)
+#else
 #define THREAD_LOCAL_OBJECTS_OFFSET (THREAD_CARD_TABLE_OFFSET + 168 * __SIZEOF_POINTER__)
+#endif
 ADD_TEST_EQ(THREAD_LOCAL_OBJECTS_OFFSET,
             art::Thread::ThreadLocalObjectsOffset<__SIZEOF_POINTER__>().Int32Value())
 // Offset of field Thread::tlsPtr_.thread_local_pos.

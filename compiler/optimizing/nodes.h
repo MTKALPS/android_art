@@ -37,6 +37,9 @@
 #include "primitive.h"
 #include "utils/array_ref.h"
 #include "utils/intrusive_forward_list.h"
+#ifdef MTK_ART_COMMON
+#include "optimizing_compiler_stats.h"
+#endif
 
 namespace art {
 
@@ -60,6 +63,9 @@ class LiveInterval;
 class LocationSummary;
 class SlowPathCode;
 class SsaBuilder;
+#ifdef MTK_ART_COMMON
+class LoopStructure;
+#endif
 
 namespace mirror {
 class DexCache;
@@ -287,6 +293,10 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
       : arena_(arena),
         blocks_(arena->Adapter(kArenaAllocBlockList)),
         reverse_post_order_(arena->Adapter(kArenaAllocReversePostOrder)),
+#ifdef MTK_ART_COMMON
+        cdg_reverse_post_order_(arena->Adapter(kArenaAllocReversePostOrder)),
+        enhanced_inlined_(false),
+#endif
         linear_order_(arena->Adapter(kArenaAllocLinearOrder)),
         entry_block_(nullptr),
         exit_block_(nullptr),
@@ -333,12 +343,34 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   void SetExitBlock(HBasicBlock* block) { exit_block_ = block; }
 
   void AddBlock(HBasicBlock* block);
+#ifdef MTK_ART_COMMON
+  void SetEnhancedInlined() { enhanced_inlined_ = true; }
+  bool HasEnhancedInlined() { return enhanced_inlined_ == true; }
+  // The compilation stat can't be changed between init and access.
+  void InitRecordStat(MethodCompilationStat stat) {
+    record_stat_.first = stat;
+    record_stat_.second = 0;
+  }
+  void UpdateRecordStat(MethodCompilationStat stat, int32_t value) {
+    CHECK(stat == record_stat_.first);
+    record_stat_.second += value;
+  }
+  int32_t GetRecordStat(MethodCompilationStat stat) {
+    CHECK(stat == record_stat_.first);
+    return record_stat_.second;
+  }
+  // Update the graph, reverse post order, loop information and Domination.
+  void ChainAfter(HBasicBlock* at, HBasicBlock* succ);
+#endif
 
   void ComputeDominanceInformation();
   void ClearDominanceInformation();
   void ClearLoopInformation();
   void FindBackEdges(ArenaBitVector* visited);
   GraphAnalysisResult BuildDominatorTree();
+#ifdef MTK_ART_COMMON
+  bool BuildPostDominatorTree();
+#endif
   void SimplifyCFG();
   void SimplifyCatchBlocks();
 
@@ -483,6 +515,9 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   }
 
   HCurrentMethod* GetCurrentMethod();
+#ifdef MTK_ART_COMMON
+  HBasicBlock* FindCommonPostDominator(HBasicBlock* first, HBasicBlock* second) const;
+#endif
 
   const DexFile& GetDexFile() const {
     return dex_file_;
@@ -519,6 +554,11 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   ReferenceTypeInfo GetInexactObjectRti() const { return inexact_object_rti_; }
 
  private:
+#ifdef MTK_ART_COMMON
+  void VisitBlockForPostDominatorTree(HBasicBlock* block,
+                                  HBasicBlock* predecessor,
+                                  ArenaVector<size_t>* visits);
+#endif
   void RemoveInstructionsAsUsersFromDeadBlocks(const ArenaBitVector& visited) const;
   void RemoveDeadBlocks(const ArenaBitVector& visited);
 
@@ -559,6 +599,12 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
 
   // List of blocks to perform a reverse post order tree traversal.
   ArenaVector<HBasicBlock*> reverse_post_order_;
+#ifdef MTK_ART_COMMON
+  // List of blocks to perform a reverse post order tree traversal.
+  ArenaVector<HBasicBlock*> cdg_reverse_post_order_;
+  bool enhanced_inlined_;
+  std::pair<MethodCompilationStat, int32_t> record_stat_;
+#endif
 
   // List of blocks to perform a linear order tree traversal.
   ArenaVector<HBasicBlock*> linear_order_;
@@ -653,9 +699,18 @@ class HLoopInformation : public ArenaObject<kArenaAllocLoopInfo> {
         contains_irreducible_loop_(false),
         back_edges_(graph->GetArena()->Adapter(kArenaAllocLoopInfoBackEdges)),
         // Make bit vector growable, as the number of blocks may change.
+        #ifdef MTK_ART_COMMON
+        blocks_(graph->GetArena(), graph->GetBlocks().size(), true, kArenaAllocLoopInfoBackEdges),
+        loop_structure_(nullptr),
+        is_nested_(false) {
+          UNUSED(loop_structure_);
+          back_edges_.reserve(kDefaultNumberOfBackEdges);
+        }
+        #else
         blocks_(graph->GetArena(), graph->GetBlocks().size(), true, kArenaAllocLoopInfoBackEdges) {
-    back_edges_.reserve(kDefaultNumberOfBackEdges);
-  }
+          back_edges_.reserve(kDefaultNumberOfBackEdges);
+        }
+        #endif
 
   bool IsIrreducible() const { return irreducible_; }
   bool ContainsIrreducibleLoop() const { return contains_irreducible_loop_; }
@@ -722,6 +777,19 @@ class HLoopInformation : public ArenaObject<kArenaAllocLoopInfo> {
 
   void Add(HBasicBlock* block);
   void Remove(HBasicBlock* block);
+  #ifdef MTK_ART_COMMON
+  void SetLoopStructure(LoopStructure* loop_structure) {
+    loop_structure_ = loop_structure;
+  }
+
+  LoopStructure* GetLoopStructure() {
+    return loop_structure_;
+  }
+
+  bool IsNestedLoop() { return is_nested_; }
+  bool IsEarlyExitLoop() { return is_early_exit_loop_; }
+  void SetIsEarlyExitLoop() { is_early_exit_loop_ = true; }
+  #endif
 
   void ClearAllBlocks() {
     blocks_.ClearAllBits();
@@ -746,6 +814,12 @@ class HLoopInformation : public ArenaObject<kArenaAllocLoopInfo> {
   bool contains_irreducible_loop_;
   ArenaVector<HBasicBlock*> back_edges_;
   ArenaBitVector blocks_;
+
+  #ifdef MTK_ART_COMMON
+  LoopStructure* loop_structure_;
+  bool is_nested_;
+  bool is_early_exit_loop_ = false;
+  #endif
 
   DISALLOW_COPY_AND_ASSIGN(HLoopInformation);
 };
@@ -820,6 +894,11 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
         dominator_(nullptr),
         dominated_blocks_(graph->GetArena()->Adapter(kArenaAllocDominated)),
         block_id_(kInvalidBlockId),
+#ifdef MTK_ART_COMMON
+        post_dominator_(nullptr),
+        post_dominated_blocks_(graph->GetArena()->Adapter(kArenaAllocDominated)),
+        post_dominance_frontier_blocks_(graph->GetArena()->Adapter(kArenaAllocDominated)),
+#endif
         dex_pc_(dex_pc),
         lifetime_start_(kNoLifetime),
         lifetime_end_(kNoLifetime),
@@ -847,6 +926,16 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
   const ArenaVector<HBasicBlock*>& GetDominatedBlocks() const {
     return dominated_blocks_;
   }
+
+#ifdef MTK_ART_COMMON
+  const ArenaVector<HBasicBlock*>& GetPostDominatedBlocks() const {
+    return post_dominated_blocks_;
+  }
+
+  const ArenaVector<HBasicBlock*>& GetPostDominanceFrontierBlocks() const {
+    return post_dominance_frontier_blocks_;
+  }
+#endif
 
   bool IsEntryBlock() const {
     return graph_->GetEntryBlock() == this;
@@ -889,6 +978,13 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
   void RemoveDominatedBlock(HBasicBlock* block) {
     RemoveElement(dominated_blocks_, block);
   }
+
+#ifdef MTK_ART_COMMON
+  HBasicBlock* GetPostDominator() const { return post_dominator_; }
+  void SetPostDominator(HBasicBlock* post_dominator) { post_dominator_ = post_dominator; }
+  void AddPostDominatedBlock(HBasicBlock* block) { post_dominated_blocks_.push_back(block); }
+  void AddPostDominanceFrontierBlock(HBasicBlock* block) { post_dominance_frontier_blocks_.push_back(block); }
+#endif
 
   void ReplaceDominatedBlock(HBasicBlock* existing, HBasicBlock* new_block) {
     ReplaceElement(dominated_blocks_, existing, new_block);
@@ -998,6 +1094,11 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
   // loop and try/catch information are not updated.
   HBasicBlock* CreateImmediateDominator();
 
+#ifdef MTK_ART_COMMON
+  void ChainSuccessor(HBasicBlock* to);
+  void BackwardRemoveInstructions(HInstruction* instruction, int32_t number,
+                                  bool ensure_safety = true);
+#endif
   // Split the block into two blocks just before `cursor`. Returns the newly
   // created, latter block. Note that this method will add the block to the
   // graph, create a Goto at the end of the former block and will create an edge
@@ -1148,6 +1249,11 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
   HBasicBlock* dominator_;
   ArenaVector<HBasicBlock*> dominated_blocks_;
   uint32_t block_id_;
+#ifdef MTK_ART_COMMON
+  HBasicBlock* post_dominator_;
+  ArenaVector<HBasicBlock*> post_dominated_blocks_;
+  ArenaVector<HBasicBlock*> post_dominance_frontier_blocks_;
+#endif
   // The dex program counter of the first instruction of this block.
   const uint32_t dex_pc_;
   size_t lifetime_start_;
@@ -1272,9 +1378,22 @@ class HLoopInformationOutwardIterator : public ValueObject {
 #if !defined(ART_ENABLE_CODEGEN_arm) && !defined(ART_ENABLE_CODEGEN_arm64)
 #define FOR_EACH_CONCRETE_INSTRUCTION_SHARED(M)
 #else
+#ifdef MTK_ART_COMMON
+#define FOR_EACH_CONCRETE_INSTRUCTION_SHARED(M)                         \
+  M(BitwiseNegatedRight, Instruction)                                   \
+  M(MultiplyAccumulate, Instruction)                                    \
+  M(ZeroBranch, Instruction)                                            \
+  M(Mla, TernaryOperation)                                              \
+  M(Pow, BinaryOperation)                                               \
+  M(VectorSplat, Instruction)                                           \
+  M(AddReduce, Instruction)                                             \
+  M(GetElementPtr, Instruction)                                         \
+  M(ConstantVector, Instruction)
+#else
 #define FOR_EACH_CONCRETE_INSTRUCTION_SHARED(M)                         \
   M(BitwiseNegatedRight, Instruction)                                   \
   M(MultiplyAccumulate, Instruction)
+#endif
 #endif
 
 #ifndef ART_ENABLE_CODEGEN_arm
@@ -1318,12 +1437,22 @@ class HLoopInformationOutwardIterator : public ValueObject {
   FOR_EACH_CONCRETE_INSTRUCTION_X86(M)                                  \
   FOR_EACH_CONCRETE_INSTRUCTION_X86_64(M)
 
+#ifdef MTK_ART_COMMON
+#define FOR_EACH_ABSTRACT_INSTRUCTION(M)                                \
+  M(Condition, BinaryOperation)                                         \
+  M(Constant, Instruction)                                              \
+  M(UnaryOperation, Instruction)                                        \
+  M(BinaryOperation, Instruction)                                       \
+  M(Invoke, Instruction)  \
+  M(TernaryOperation, Instruction)
+#else
 #define FOR_EACH_ABSTRACT_INSTRUCTION(M)                                \
   M(Condition, BinaryOperation)                                         \
   M(Constant, Instruction)                                              \
   M(UnaryOperation, Instruction)                                        \
   M(BinaryOperation, Instruction)                                       \
   M(Invoke, Instruction)
+#endif
 
 #define FOR_EACH_INSTRUCTION(M)                                         \
   FOR_EACH_CONCRETE_INSTRUCTION(M)                                      \
@@ -1615,10 +1744,19 @@ class SideEffects : public ValueObject {
     switch (type) {
       case Primitive::kPrimInt:
       case Primitive::kPrimFloat:
+#ifdef MTK_ART_COMMON
+      case Primitive::kVectorFloatx4:
+      case Primitive::kVectorInt32x4:
+      case Primitive::kVectorInt16x8:
+      case Primitive::kVectorInt8x16:
+#endif
         return TypeFlag(Primitive::kPrimInt, offset) |
                TypeFlag(Primitive::kPrimFloat, offset);
       case Primitive::kPrimLong:
       case Primitive::kPrimDouble:
+#ifdef MTK_ART_COMMON
+      case Primitive::kVectorDoublex2:
+#endif
         return TypeFlag(Primitive::kPrimLong, offset) |
                TypeFlag(Primitive::kPrimDouble, offset);
       default:
@@ -1785,6 +1923,13 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   HInstruction* GetNext() const { return next_; }
   HInstruction* GetPrevious() const { return previous_; }
 
+#ifdef MTK_ART_COMMON
+  void ResetLink(HInstruction* next, HInstruction* prev) {
+    next_ = next;
+    previous_ = prev;
+  }
+#endif
+
   HInstruction* GetNextDisregardingMoves() const;
   HInstruction* GetPreviousDisregardingMoves() const;
 
@@ -1938,7 +2083,9 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
 
   void ReplaceWith(HInstruction* instruction);
   void ReplaceInput(HInstruction* replacement, size_t index);
-
+#ifdef MTK_ART_COMMON
+  bool ReplaceFieldWith(HInstruction* instruction);
+#endif
   // This is almost the same as doing `ReplaceWith()`. But in this helper, the
   // uses of this instruction by `other` are *not* updated.
   void ReplaceWithExceptInReplacementAtIndex(HInstruction* other, size_t use_index) {
@@ -1961,7 +2108,6 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   bool Is##type() const;                                                       \
   const H##type* As##type() const;                                             \
   H##type* As##type();
-
   FOR_EACH_CONCRETE_INSTRUCTION(INSTRUCTION_TYPE_CHECK)
 #undef INSTRUCTION_TYPE_CHECK
 
@@ -3031,6 +3177,54 @@ enum class ComparisonBias {
   kLast = kLtBias
 };
 
+#ifdef MTK_ART_COMMON
+class HTernaryOperation : public HExpression<3> {
+ public:
+  HTernaryOperation(Primitive::Type result_type,
+                   HInstruction* first,
+                   HInstruction* second,
+                   HInstruction* third,
+                   uint32_t dex_pc = kNoDexPc)
+                    : HExpression(result_type, SideEffects::None(), dex_pc) {
+    SetRawInputAt(0, first);
+    SetRawInputAt(1, second);
+    SetRawInputAt(2, third);
+  }
+
+  HInstruction* GetFirst() const { return InputAt(0); }
+  HInstruction* GetSecond() const { return InputAt(1); }
+  HInstruction* GetThird() const { return InputAt(2); }
+  Primitive::Type GetResultType() const { return GetType(); }
+
+  virtual bool IsCommutative() const { return false; }
+
+  // Apply this operation to `x`, `y`, and `z`.
+  virtual HConstant* Evaluate(HNullConstant* x ATTRIBUTE_UNUSED,
+                              HNullConstant* y ATTRIBUTE_UNUSED,
+                              HNullConstant* z ATTRIBUTE_UNUSED) const {
+    LOG(FATAL) << DebugName() << " is not defined for the (null, null, null) case.";
+    UNREACHABLE();
+  }
+  virtual HConstant* Evaluate(HIntConstant* x,
+                              HIntConstant* y,
+                              HIntConstant* z) const = 0;
+  virtual HConstant* Evaluate(HLongConstant* x,
+                              HLongConstant* y,
+                              HLongConstant* z) const = 0;
+
+  bool CanBeMoved() const OVERRIDE { return true; }
+  bool InstructionDataEquals(HInstruction* other) const OVERRIDE {
+    UNUSED(other);
+    return true;
+  }
+
+  DECLARE_ABSTRACT_INSTRUCTION(TernaryOperation);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(HTernaryOperation);
+};
+#endif
+
 std::ostream& operator<<(std::ostream& os, const ComparisonBias& rhs);
 
 class HCondition : public HBinaryOperation {
@@ -3740,9 +3934,12 @@ class HInvoke : public HInstruction {
   const uint32_t* GetIntrinsicOptimizations() const {
     return &intrinsic_optimizations_;
   }
-
   bool IsIntrinsic() const { return intrinsic_ != Intrinsics::kNone; }
 
+#ifdef MTK_ART_COMMON
+  bool IsStopInline() { return stop_inline; }
+  void SetStopInline() { stop_inline = true; }
+#endif
   DECLARE_ABSTRACT_INSTRUCTION(Invoke);
 
  protected:
@@ -3774,7 +3971,12 @@ class HInvoke : public HInstruction {
               arena->Adapter(kArenaAllocInvokeInputs)),
       dex_method_index_(dex_method_index),
       intrinsic_(Intrinsics::kNone),
+#ifdef MTK_ART_COMMON
+      intrinsic_optimizations_(0),
+      stop_inline(false) {
+#else
       intrinsic_optimizations_(0) {
+#endif
     SetPackedField<ReturnTypeField>(return_type);
     SetPackedField<OriginalInvokeTypeField>(original_invoke_type);
     SetPackedFlag<kFlagCanThrow>(true);
@@ -3799,6 +4001,9 @@ class HInvoke : public HInstruction {
   uint32_t intrinsic_optimizations_;
 
  private:
+#ifdef MTK_ART_COMMON
+  bool stop_inline;
+#endif
   DISALLOW_COPY_AND_ASSIGN(HInvoke);
 };
 
@@ -5099,7 +5304,12 @@ class HArrayGet : public HExpression<2> {
             SideEffects additional_side_effects = SideEffects::None())
       : HExpression(type,
                     SideEffects::ArrayReadOfType(type).Union(additional_side_effects),
+#ifdef MTK_ART_COMMON
+                    dex_pc),
+        needs_addr_inc_(false) {
+#else
                     dex_pc) {
+#endif
     SetRawInputAt(0, array);
     SetRawInputAt(1, index);
   }
@@ -5135,10 +5345,17 @@ class HArrayGet : public HExpression<2> {
 
   HInstruction* GetArray() const { return InputAt(0); }
   HInstruction* GetIndex() const { return InputAt(1); }
+#ifdef MTK_ART_COMMON
+  void SetAddressIncrement() { needs_addr_inc_ = true; }
+  bool NeedsAddressIncrement() { return needs_addr_inc_; }
+#endif
 
   DECLARE_INSTRUCTION(ArrayGet);
 
  private:
+#ifdef MTK_ART_COMMON
+  bool needs_addr_inc_;
+#endif
   DISALLOW_COPY_AND_ASSIGN(HArrayGet);
 };
 
@@ -5154,7 +5371,12 @@ class HArraySet : public HTemplateInstruction<3> {
             SideEffects::ArrayWriteOfType(expected_component_type).Union(
                 SideEffectsForArchRuntimeCalls(value->GetType())).Union(
                     additional_side_effects),
+#ifdef MTK_ART_COMMON
+            dex_pc),
+        needs_addr_inc_(false) {
+#else
             dex_pc) {
+#endif
     SetPackedField<ExpectedComponentTypeField>(expected_component_type);
     SetPackedFlag<kFlagNeedsTypeCheck>(value->GetType() == Primitive::kPrimNot);
     SetPackedFlag<kFlagValueCanBeNull>(true);
@@ -5218,6 +5440,11 @@ class HArraySet : public HTemplateInstruction<3> {
     return (value_type == Primitive::kPrimNot) ? SideEffects::CanTriggerGC() : SideEffects::None();
   }
 
+#ifdef MTK_ART_COMMON
+  void SetAddressIncrement() { needs_addr_inc_ = true; }
+  bool NeedsAddressIncrement() { return needs_addr_inc_; }
+#endif
+
   DECLARE_INSTRUCTION(ArraySet);
 
  private:
@@ -5235,6 +5462,9 @@ class HArraySet : public HTemplateInstruction<3> {
   static_assert(kNumberOfArraySetPackedBits <= kMaxNumberOfPackedBits, "Too many packed fields.");
   using ExpectedComponentTypeField =
       BitField<Primitive::Type, kFieldExpectedComponentType, kFieldExpectedComponentTypeSize>;
+#ifdef MTK_ART_COMMON
+  bool needs_addr_inc_;
+#endif
 
   DISALLOW_COPY_AND_ASSIGN(HArraySet);
 };
@@ -6584,6 +6814,74 @@ inline bool IsSameDexFile(const DexFile& lhs, const DexFile& rhs) {
 
   FOR_EACH_CONCRETE_INSTRUCTION(INSTRUCTION_TYPE_CHECK)
 #undef INSTRUCTION_TYPE_CHECK
+
+class SwitchTable : public ValueObject {
+ public:
+  SwitchTable(const Instruction& instruction, uint32_t dex_pc, bool sparse)
+      : instruction_(instruction), dex_pc_(dex_pc), sparse_(sparse) {
+    int32_t table_offset = instruction.VRegB_31t();
+    const uint16_t* table = reinterpret_cast<const uint16_t*>(&instruction) + table_offset;
+    if (sparse) {
+      CHECK_EQ(table[0], static_cast<uint16_t>(Instruction::kSparseSwitchSignature));
+    } else {
+      CHECK_EQ(table[0], static_cast<uint16_t>(Instruction::kPackedSwitchSignature));
+    }
+    num_entries_ = table[1];
+    values_ = reinterpret_cast<const int32_t*>(&table[2]);
+  }
+
+  uint16_t GetNumEntries() const {
+    return num_entries_;
+  }
+
+  void CheckIndex(size_t index) const {
+    if (sparse_) {
+      // In a sparse table, we have num_entries_ keys and num_entries_ values, in that order.
+      DCHECK_LT(index, 2 * static_cast<size_t>(num_entries_));
+    } else {
+      // In a packed table, we have the starting key and num_entries_ values.
+      DCHECK_LT(index, 1 + static_cast<size_t>(num_entries_));
+    }
+  }
+
+  int32_t GetEntryAt(size_t index) const {
+    CheckIndex(index);
+    return values_[index];
+  }
+
+  uint32_t GetDexPcForIndex(size_t index) const {
+    CheckIndex(index);
+    return dex_pc_ +
+        (reinterpret_cast<const int16_t*>(values_ + index) -
+         reinterpret_cast<const int16_t*>(&instruction_));
+  }
+
+  // Index of the first value in the table.
+  size_t GetFirstValueIndex() const {
+    if (sparse_) {
+      // In a sparse table, we have num_entries_ keys and num_entries_ values, in that order.
+      return num_entries_;
+    } else {
+      // In a packed table, we have the starting key and num_entries_ values.
+      return 1;
+    }
+  }
+
+ private:
+  const Instruction& instruction_;
+  const uint32_t dex_pc_;
+
+  // Whether this is a sparse-switch table (or a packed-switch one).
+  const bool sparse_;
+
+  // This can't be const as it needs to be computed off of the given instruction, and complicated
+  // expressions in the initializer list seemed very ugly.
+  uint16_t num_entries_;
+
+  const int32_t* values_;
+
+  DISALLOW_COPY_AND_ASSIGN(SwitchTable);
+};
 
 // Create space in `blocks` for adding `number_of_new_blocks` entries
 // starting at location `at`. Blocks after `at` are moved accordingly.

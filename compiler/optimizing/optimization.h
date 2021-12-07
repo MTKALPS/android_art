@@ -45,6 +45,9 @@ class HOptimization : public ArenaObject<kArenaAllocOptimization> {
 
  protected:
   void MaybeRecordStat(MethodCompilationStat compilation_stat, size_t count = 1) const;
+#ifdef MTK_ART_COMMON
+  void MTKMaybeRecordStat(MethodCompilationStat compilation_stat, size_t count = 1) const;
+#endif
 
   HGraph* const graph_;
   // Used to record stats about the optimization.

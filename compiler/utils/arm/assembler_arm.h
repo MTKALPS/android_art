@@ -30,6 +30,9 @@
 #include "utils/arm/managed_register_arm.h"
 #include "utils/assembler.h"
 #include "offsets.h"
+#ifdef MTK_ART_COMMON
+#include "primitive.h"
+#endif
 
 namespace art {
 namespace arm {
@@ -684,6 +687,23 @@ class ArmAssembler : public Assembler {
 
   // Memory barriers.
   virtual void dmb(DmbOptions flavor) = 0;
+#ifdef MTK_ART_COMMON
+  virtual void vdup(VRegister vd, Register rt, Primitive::Type vector_type) = 0;
+  virtual void vaddq(VRegister vd, VRegister vn, VRegister vm,
+                     Primitive::Type vector_type) = 0;
+  virtual void vaddq(DRegister dd, DRegister dn, DRegister dm) = 0;
+  virtual void vmulq(VRegister vd, VRegister vn, VRegister vm,
+                     Primitive::Type vector_type) = 0;
+  virtual void vpaddl(VRegister vd, VRegister vn, Primitive::Type vector_type) = 0;
+  virtual void vldm(VRegister vd, const Address& ad,
+                    Primitive::Type vector_type,
+                    Condition cond = AL) = 0;
+  virtual void vstm(VRegister vn, const Address& ad,
+                    Primitive::Type vector_type,
+                    Condition cond = AL) = 0;
+  virtual void vmovvr(VRegister vd, int vd_index, Register rt,
+                      Primitive::Type vector_type, bool r2v = true, Condition cond = AL) = 0;
+#endif
 
   void Pad(uint32_t bytes);
 

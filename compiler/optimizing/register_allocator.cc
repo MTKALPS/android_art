@@ -31,10 +31,19 @@ static constexpr size_t kDefaultNumberOfSpillSlots = 4;
 // For simplicity, we implement register pairs as (reg, reg + 1).
 // Note that this is a requirement for double registers on ARM, since we
 // allocate SRegister.
+#ifdef MTK_ART_COMMON
+static int GetHighForLowRegister(int reg, Primitive::Type type) {
+  return (Primitive::IsVectorType(type)) ? reg + 2 : reg + 1;
+}
+#endif
 static int GetHighForLowRegister(int reg) { return reg + 1; }
 static bool IsLowRegister(int reg) { return (reg & 1) == 0; }
 static bool IsLowOfUnalignedPairInterval(LiveInterval* low) {
+#ifdef MTK_ART_COMMON
+  return GetHighForLowRegister(low->GetRegister(), low->GetType()) != low->GetHighInterval()->GetRegister();
+#else
   return GetHighForLowRegister(low->GetRegister()) != low->GetHighInterval()->GetRegister();
+#endif
 }
 
 RegisterAllocator::RegisterAllocator(ArenaAllocator* allocator,
@@ -273,7 +282,12 @@ void RegisterAllocator::ProcessInstruction(HInstruction* instruction) {
   }
 
   bool core_register = (instruction->GetType() != Primitive::kPrimDouble)
+#ifdef MTK_ART_COMMON
+      && (instruction->GetType() != Primitive::kPrimFloat)
+      && (!Primitive::IsVectorType(instruction->GetType()));
+#else
       && (instruction->GetType() != Primitive::kPrimFloat);
+#endif
 
   if (locations->NeedsSafepoint()) {
     if (codegen_->IsLeafMethod()) {
@@ -700,7 +714,11 @@ void RegisterAllocator::LinearScan() {
           : Location::FpuRegisterLocation(current->GetRegister()));
       active_.push_back(current);
       if (current->HasHighInterval() && !current->GetHighInterval()->HasRegister()) {
+#ifdef MTK_ART_COMMON
+        current->GetHighInterval()->SetRegister(GetHighForLowRegister(current->GetRegister(), current->GetType()));
+#else
         current->GetHighInterval()->SetRegister(GetHighForLowRegister(current->GetRegister()));
+#endif
       }
     }
   }
@@ -815,11 +833,20 @@ bool RegisterAllocator::TryAllocateFreeReg(LiveInterval* current) {
     if ((hint != kNoRegister)
         // For simplicity, if the hint we are getting for a pair cannot be used,
         // we are just going to allocate a new pair.
+#ifdef MTK_ART_COMMON
+        && !(current->IsLowInterval() && IsBlocked(GetHighForLowRegister(hint, current->GetType())))) {
+#else
         && !(current->IsLowInterval() && IsBlocked(GetHighForLowRegister(hint)))) {
+#endif
       DCHECK(!IsBlocked(hint));
       reg = hint;
     } else if (current->IsLowInterval()) {
+#ifdef MTK_ART_COMMON
+      reg = FindAvailableRegisterPair(free_until, current->GetStart(),
+                                      Primitive::IsVectorType(current->GetType()));
+#else
       reg = FindAvailableRegisterPair(free_until, current->GetStart());
+#endif
     } else {
       reg = FindAvailableRegister(free_until, current);
     }
@@ -835,7 +862,11 @@ bool RegisterAllocator::TryAllocateFreeReg(LiveInterval* current) {
     // If the high register of this interval is not available, we need to spill.
     int high_reg = current->GetHighInterval()->GetRegister();
     if (high_reg == kNoRegister) {
+#ifdef MTK_ART_COMMON
+      high_reg = GetHighForLowRegister(reg, current->GetType());
+#else
       high_reg = GetHighForLowRegister(reg);
+#endif
     }
     if (free_until[high_reg] == 0) {
       return false;
@@ -860,7 +891,19 @@ bool RegisterAllocator::IsBlocked(int reg) const {
       : blocked_fp_registers_[reg];
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+bool RegisterAllocator::IsBlocked(int reg, bool packed) const {
+  UNUSED(packed);
+  return IsBlocked(reg);
+}
+
+__attribute__((weak))
+int RegisterAllocator::FindAvailableRegisterPair(size_t* next_use, size_t starting_at, bool packed) const {
+  UNUSED(packed);
+#else
 int RegisterAllocator::FindAvailableRegisterPair(size_t* next_use, size_t starting_at) const {
+#endif
   int reg = kNoRegister;
   // Pick the register pair that is used the last.
   for (size_t i = 0; i < number_of_registers_; ++i) {
@@ -1058,10 +1101,18 @@ bool RegisterAllocator::AllocateBlockedReg(LiveInterval* current) {
     // When allocating the low part, we made sure the high register was available.
     DCHECK_LT(first_register_use, next_use[reg]);
   } else if (current->IsLowInterval()) {
+#ifdef MTK_ART_COMMON
+    reg = FindAvailableRegisterPair(next_use, first_register_use,
+                                    Primitive::IsVectorType(current->GetType()));
+    // We should spill if both registers are not available.
+    should_spill = (first_register_use >= next_use[reg])
+      || (first_register_use >= next_use[GetHighForLowRegister(reg, current->GetType())]);
+#else
     reg = FindAvailableRegisterPair(next_use, first_register_use);
     // We should spill if both registers are not available.
     should_spill = (first_register_use >= next_use[reg])
       || (first_register_use >= next_use[GetHighForLowRegister(reg)]);
+#endif
   } else {
     DCHECK(!current->IsHighInterval());
     reg = FindAvailableRegister(next_use, current);
@@ -1322,6 +1373,13 @@ void RegisterAllocator::AllocateSpillSlotFor(LiveInterval* interval) {
   ArenaVector<size_t>* spill_slots = nullptr;
   switch (interval->GetType()) {
     case Primitive::kPrimDouble:
+#ifdef MTK_ART_COMMON
+    case Primitive::kVectorDoublex2:
+    case Primitive::kVectorFloatx4:
+    case Primitive::kVectorInt32x4:
+    case Primitive::kVectorInt16x8:
+    case Primitive::kVectorInt8x16:
+#endif
       spill_slots = &double_spill_slots_;
       break;
     case Primitive::kPrimLong:
@@ -1874,6 +1932,13 @@ void RegisterAllocator::Resolve() {
       size_t slot = current->GetSpillSlot();
       switch (current->GetType()) {
         case Primitive::kPrimDouble:
+#ifdef MTK_ART_COMMON
+        case Primitive::kVectorDoublex2:
+        case Primitive::kVectorFloatx4:
+        case Primitive::kVectorInt32x4:
+        case Primitive::kVectorInt16x8:
+        case Primitive::kVectorInt8x16:
+#endif
           slot += long_spill_slots_.size();
           FALLTHROUGH_INTENDED;
         case Primitive::kPrimLong:

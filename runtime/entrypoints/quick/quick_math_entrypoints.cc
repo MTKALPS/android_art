@@ -15,6 +15,9 @@
  */
 
 #include <stdint.h>
+#ifdef MTK_ART_COMMON
+#include "base/logging.h"
+#endif
 
 namespace art {
 
@@ -82,5 +85,32 @@ extern "C" int64_t artLdiv(int64_t a, int64_t b) {
 extern "C" int64_t artLmod(int64_t a, int64_t b) {
   return a % b;
 }
+
+#ifdef MTK_ART_COMMON
+// Below integer power() doesn't support negative exponent.
+extern "C" int64_t artLpow64(int64_t a, int64_t b) {
+  DCHECK_GE(b, 0);
+  int64_t result = 1;
+  while (b != 0) {
+    if ((b & 1) == 1)
+      result *= a;
+    b >>= 1;
+    a *= a;
+  }
+  return result;
+}
+
+extern "C" int32_t artLpow32(int32_t a, int32_t b) {
+  DCHECK_GE(b, 0);
+  int32_t result = 1;
+  while (b != 0) {
+    if ((b & 1) == 1)
+      result *= a;
+    b >>= 1;
+    a *= a;
+  }
+  return result;
+}
+#endif
 
 }  // namespace art

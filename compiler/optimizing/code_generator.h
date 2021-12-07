@@ -32,6 +32,7 @@
 #include "optimizing_compiler_stats.h"
 #include "stack_map_stream.h"
 #include "utils/label.h"
+#include "optimizing_compiler_stats.h"
 
 namespace art {
 
@@ -51,6 +52,9 @@ static int32_t constexpr kPrimIntMax = 0x7fffffff;
 static int64_t constexpr kPrimLongMax = INT64_C(0x7fffffffffffffff);
 
 class Assembler;
+#ifdef MTK_ART_COMMON
+class CompilerDriver;
+#endif
 class CodeGenerator;
 class CompilerDriver;
 class LinkerPatch;
@@ -203,6 +207,16 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
 
   virtual Assembler* GetAssembler() = 0;
   virtual const Assembler& GetAssembler() const = 0;
+#ifdef MTK_ART_COMMON
+  virtual void SetWrapperOption(CompilerDriver* compiler_driver,
+                                OptimizingCompilerStats* stats) {
+    UNUSED(compiler_driver);
+    UNUSED(stats);
+  }
+  virtual const CompilerDriver* GetCompilerDriver() {
+    return nullptr;
+  }
+#endif
   virtual size_t GetWordSize() const = 0;
   virtual size_t GetFloatingPointSpillSlotSize() const = 0;
   virtual uintptr_t GetAddressOf(HBasicBlock* block) = 0;
@@ -614,6 +628,11 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   void EmitEnvironment(HEnvironment* environment, SlowPathCode* slow_path);
 
   OptimizingCompilerStats* stats_;
+
+#ifdef MTK_ART_COMMON
+  virtual void WrapperInit(HBasicBlock* block) { UNUSED(block); }
+  virtual void WrapperFinalize() {}
+#endif
 
   HGraph* const graph_;
   const CompilerOptions& compiler_options_;

@@ -58,6 +58,10 @@ Location MipsReturnLocation(Primitive::Type return_type) {
 
     case Primitive::kPrimVoid:
       return Location();
+#ifdef MTK_ART_COMMON
+    default:
+      UNREACHABLE();
+#endif
   }
   UNREACHABLE();
 }
@@ -127,6 +131,9 @@ Location InvokeDexCallingConventionVisitorMIPS::GetNextLocation(Primitive::Type 
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unexpected parameter type " << type;
       break;
   }
@@ -1789,6 +1796,9 @@ void InstructionCodeGeneratorMIPS::VisitArrayGet(HArrayGet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << instruction->GetType();
       UNREACHABLE();
   }
@@ -1952,6 +1962,9 @@ void InstructionCodeGeneratorMIPS::VisitArraySet(HArraySet* instruction) {
     }
 
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << instruction->GetType();
       UNREACHABLE();
   }
@@ -3447,6 +3460,9 @@ void InstructionCodeGeneratorMIPS::HandleFieldGet(HInstruction* instruction,
       load_type = kLoadDoubleword;
       break;
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }
@@ -3570,6 +3586,9 @@ void InstructionCodeGeneratorMIPS::HandleFieldSet(HInstruction* instruction,
       store_type = kStoreDoubleword;
       break;
     case Primitive::kPrimVoid:
+#ifdef MTK_ART_COMMON
+    default:
+#endif
       LOG(FATAL) << "Unreachable type " << type;
       UNREACHABLE();
   }

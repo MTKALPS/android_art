@@ -387,7 +387,11 @@ static bool InstructionSetSupportsReadBarrier(InstructionSet instruction_set) {
       || instruction_set == kX86_64;
 }
 
-static void RunOptimizations(HOptimization* optimizations[],
+#ifdef MTK_ART_COMMON
+#else
+static
+#endif
+void RunOptimizations(HOptimization* optimizations[],
                              size_t length,
                              PassObserver* pass_observer) {
   for (size_t i = 0; i < length; ++i) {
@@ -396,7 +400,11 @@ static void RunOptimizations(HOptimization* optimizations[],
   }
 }
 
-static void MaybeRunInliner(HGraph* graph,
+#ifdef MTK_ART_COMMON
+#else
+static
+#endif
+void MaybeRunInliner(HGraph* graph,
                             CodeGenerator* codegen,
                             CompilerDriver* driver,
                             OptimizingCompilerStats* stats,
@@ -426,7 +434,11 @@ static void MaybeRunInliner(HGraph* graph,
   RunOptimizations(optimizations, arraysize(optimizations), pass_observer);
 }
 
-static void RunArchOptimizations(InstructionSet instruction_set,
+#ifdef MTK_ART_COMMON
+#else
+static
+#endif
+void RunArchOptimizations(InstructionSet instruction_set,
                                  HGraph* graph,
                                  CodeGenerator* codegen,
                                  OptimizingCompilerStats* stats,
@@ -479,7 +491,11 @@ static void RunArchOptimizations(InstructionSet instruction_set,
 }
 
 NO_INLINE  // Avoid increasing caller's frame size by large stack-allocated objects.
-static void AllocateRegisters(HGraph* graph,
+#ifdef MTK_ART_COMMON
+#else
+static
+#endif
+void AllocateRegisters(HGraph* graph,
                               CodeGenerator* codegen,
                               PassObserver* pass_observer) {
   {
@@ -498,7 +514,12 @@ static void AllocateRegisters(HGraph* graph,
   }
 }
 
-static void RunOptimizations(HGraph* graph,
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#else
+static
+#endif
+void RunOptimizations(HGraph* graph,
                              CodeGenerator* codegen,
                              CompilerDriver* driver,
                              OptimizingCompilerStats* stats,
@@ -646,7 +667,11 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* arena,
 
   // Implementation of the space filter: do not compile a code item whose size in
   // code units is bigger than 128.
+#ifdef MTK_ART_COMMON
+  static constexpr size_t kSpaceFilterOptimizingThreshold = 1024;
+#else
   static constexpr size_t kSpaceFilterOptimizingThreshold = 128;
+#endif
   const CompilerOptions& compiler_options = compiler_driver->GetCompilerOptions();
   if ((compiler_options.GetCompilerFilter() == CompilerFilter::kSpace)
       && (code_item->insns_size_in_code_units_ > kSpaceFilterOptimizingThreshold)) {
@@ -718,6 +743,19 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* arena,
     MaybeRecordStat(MethodCompilationStat::kNotCompiledNoCodegen);
     return nullptr;
   }
+
+#if 0 /*FIXME*/
+  #ifdef MTK_ART_COMMON
+  static constexpr size_t kSpaceFilterOptimizingThreshold2 = 256;
+  size_t num_dalvik_vreg = code_item->registers_size_;
+  if ((code_item->insns_size_in_code_units_ > kSpaceFilterOptimizingThreshold2)
+      && (compiler_options.GetCompilerFilter() == CompilerOptions::kSpace)
+      && (num_dalvik_vreg < codegen->GetNumberOfCoreRegisters())) {
+    MaybeRecordStat(MethodCompilationStat::kNotCompiledSpaceFilter);
+    return nullptr;
+  }
+  #endif
+#endif
   codegen->GetAssembler()->cfi().SetEnabled(
       compiler_driver->GetCompilerOptions().GenerateAnyDebugInfo());
 
@@ -769,6 +807,9 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* arena,
       }
     }
 
+#ifdef MTK_ART_COMMON
+    codegen->SetWrapperOption(compiler_driver, compilation_stats_.get());
+#endif
     RunOptimizations(graph,
                      codegen.get(),
                      compiler_driver,
@@ -969,5 +1010,11 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   return true;
 }
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+void OptimizingCompilerStats::PrintMTKMethodCompilationStat(int stat ATTRIBUTE_UNUSED) const {
+}
+#endif
 
 }  // namespace art

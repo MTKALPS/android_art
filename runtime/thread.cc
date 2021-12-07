@@ -2569,6 +2569,12 @@ void Thread::DumpThreadOffset(std::ostream& os, uint32_t offset) {
   QUICK_ENTRY_POINT_INFO(pReadBarrierMark)
   QUICK_ENTRY_POINT_INFO(pReadBarrierSlow)
   QUICK_ENTRY_POINT_INFO(pReadBarrierForRootSlow)
+#ifdef MTK_ART_COMMON
+  QUICK_ENTRY_POINT_INFO(pIpow32)
+  QUICK_ENTRY_POINT_INFO(pIpow64)
+  QUICK_ENTRY_POINT_INFO(pFpow)
+  QUICK_ENTRY_POINT_INFO(pFpowf)
+#endif
 #undef QUICK_ENTRY_POINT_INFO
 
   os << offset;

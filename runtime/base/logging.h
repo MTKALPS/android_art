@@ -111,6 +111,13 @@ extern const char* ProgramInvocationShortName();
 // Return the stream associated with logging for the given module.
 #define VLOG_STREAM(module) ::art::LogMessage(__FILE__, __LINE__, INFO, -1).stream()
 
+#ifdef MTK_ART_LOG
+// #define MTK_LOG(level, message) { if (level <= ::art::gMtkLogLevel) { message; } }
+#define MTK_LOG(level, message) { { message; } }
+#else
+#define MTK_LOG(level, message) {}
+#endif
+
 // Check whether condition x holds and LOG(FATAL) if not. The value of the expression x is only
 // evaluated once. Extra logging can be appended using << after. For example,
 // CHECK(false == true) results in a log message of "Check failed: false == true".

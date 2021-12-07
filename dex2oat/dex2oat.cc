@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +32,10 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+
+#ifdef __ANDROID__
+#include "cutils/properties.h"
+#endif
 
 #if defined(__linux__) && defined(__arm__)
 #include <sys/personality.h>
@@ -87,6 +96,27 @@ static constexpr size_t kDefaultMinDexFileCumulativeSizeForSwap = 20 * MB;
 
 static int original_argc;
 static char** original_argv;
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+CompilerDriver* GetCompilerDriver(const CompilerOptions* compiler_options,
+                                  VerificationResults* verification_results,
+                                  DexFileToMethodInlinerMap* method_inliner_map,
+                                  Compiler::Kind compiler_kind,
+                                  InstructionSet instruction_set,
+                                  const InstructionSetFeatures* instruction_set_features,
+                                  bool boot_image,
+                                  bool app_image,
+                                  std::unordered_set<std::string>* image_classes,
+                                  std::unordered_set<std::string>* compiled_classes,
+                                  std::unordered_set<std::string>* compiled_methods,
+                                  size_t thread_count,
+                                  bool dump_stats,
+                                  bool dump_passes,
+                                  CumulativeLogger* timer,
+                                  int swap_fd,
+                                  const ProfileCompilationInfo* profile_compilation_info);
+#endif
 
 static std::string CommandLine() {
   std::vector<std::string> command;
@@ -1055,6 +1085,16 @@ class Dex2Oat FINAL {
     std::unique_ptr<ParserOptions> parser_options(new ParserOptions());
     compiler_options_.reset(new CompilerOptions());
 
+#ifdef __ANDROID__
+    char dex2oat_thread_count[PROPERTY_VALUE_MAX];
+    if (property_get("dalvik.vm.dex2oat-threadcount", dex2oat_thread_count, NULL) > 0)  {
+      int cnt = atoi(dex2oat_thread_count);
+      if ((cnt <= sysconf(_SC_NPROCESSORS_CONF)) && (cnt >= 1))  {
+        thread_count_ = cnt;
+      }
+    }
+#endif
+
     for (int i = 0; i < argc; i++) {
       const StringPiece option(argv[i]);
       const bool log_options = false;
@@ -1170,6 +1210,10 @@ class Dex2Oat FINAL {
           Usage("Cannot use --force-determinism with read barriers or non-CMS garbage collector");
         }
         force_determinism_ = true;
+      #ifdef MTK_ART_COMMON
+      } else if (option.starts_with("--compiler-arg=")) {
+        compiler_args_ = option.substr(strlen("--compiler-arg=")).data();
+      #endif
       } else if (!compiler_options_->ParseCompilerOption(option, Usage)) {
         Usage("Unknown argument %s", option.data());
       }
@@ -1562,7 +1606,11 @@ class Dex2Oat FINAL {
       }
     }
 
+    #ifdef MTK_ART_COMMON
+    driver_.reset(GetCompilerDriver(compiler_options_.get(),
+    #else
     driver_.reset(new CompilerDriver(compiler_options_.get(),
+    #endif
                                      verification_results_.get(),
                                      &method_inliner_map_,
                                      compiler_kind_,
@@ -1580,6 +1628,9 @@ class Dex2Oat FINAL {
                                      swap_fd_,
                                      profile_compilation_info_.get()));
     driver_->SetDexFilesForOatFile(dex_files_);
+#ifdef MTK_ART_COMMON
+    driver_->SetCompilerArgs(compiler_args_);
+#endif
     driver_->CompileAll(class_loader_, dex_files_, timings_);
   }
 
@@ -2456,6 +2507,9 @@ class Dex2Oat FINAL {
   std::string boot_image_filename_;
   std::vector<const char*> runtime_args_;
   std::vector<const char*> image_filenames_;
+#ifdef MTK_ART_COMMON
+  std::string compiler_args_;
+#endif
   uintptr_t image_base_;
   const char* image_classes_zip_filename_;
   const char* image_classes_filename_;
@@ -2515,6 +2569,9 @@ class Dex2Oat FINAL {
 
   // See CompilerOptions.force_determinism_.
   bool force_determinism_;
+#ifdef mtk_art_common
+  std::string compiler_args_;
+#endif
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Dex2Oat);
 };
@@ -2633,6 +2690,10 @@ static int dex2oat(int argc, char** argv) {
 
   // Parse arguments. Argument mistakes will lead to exit(EXIT_FAILURE) in UsageError.
   dex2oat->ParseArgs(argc, argv);
+  #ifdef MTK_ART_COMMON
+  // PORTING FIXME:
+  // dex2oat.SetCompilerArgs(compiler_args_);
+  #endif
 
   // If needed, process profile information for profile guided compilation.
   // This operation involves I/O.

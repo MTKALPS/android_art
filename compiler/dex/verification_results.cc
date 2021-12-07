@@ -93,6 +93,9 @@ bool VerificationResults::IsClassRejected(ClassReference ref) {
   return (rejected_classes_.find(ref) != rejected_classes_.end());
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 bool VerificationResults::IsCandidateForCompilation(MethodReference&,
                                                     const uint32_t access_flags) {
   if (!compiler_options_->IsBytecodeCompilationEnabled()) {
