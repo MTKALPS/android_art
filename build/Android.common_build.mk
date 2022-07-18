@@ -1,4 +1,5 @@
 #
+#
 # Copyright (C) 2011 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -201,7 +202,7 @@ art_target_non_debug_cflags := \
 ifeq ($(HOST_OS),linux)
   # Larger frame-size for host clang builds today
   art_host_non_debug_cflags += -Wframe-larger-than=3000
-  art_target_non_debug_cflags += -Wframe-larger-than=1728
+  art_target_non_debug_cflags += -Wframe-larger-than=1752
 endif
 
 # FIXME: upstream LLVM has a vectorizer bug that needs to be fixed
@@ -213,17 +214,44 @@ art_debug_cflags := \
   -DDYNAMIC_ANNOTATIONS_ENABLED=1 \
   -UNDEBUG
 
+#
+# Used to enable/disable MTK ART optimizations
+#
+ifeq ($(MTK_ART_OPT_ENABLE),)
+MTK_ART_OPT_ENABLE := true
+endif
+ifeq ($(strip $(MTK_EMULATOR_SUPPORT)),yes)
+MTK_ART_OPT_ENABLE := false
+endif
+
+#
+# MTK ART optimization features
+#
+MTK_CFLAGS :=
+ifeq ($(MTK_ART_OPT_ENABLE),true)
+MTK_CFLAGS += -DMTK_ART_COMMON
+
+ifeq ($(MTK_ART_OPT_LOW_RAM_MODE),true)
+MTK_CFLAGS += -DMTK_ART_OPT_LOW_RAM_MODE
+endif
+
+# Turn off this in release build
+# MTK_CFLAGS += -DMTK_ART_LOG
+endif
+
 ifndef LIBART_IMG_HOST_BASE_ADDRESS
   $(error LIBART_IMG_HOST_BASE_ADDRESS unset)
 endif
 ART_HOST_CFLAGS := $(art_cflags) -DANDROID_SMP=1 -DART_BASE_ADDRESS=$(LIBART_IMG_HOST_BASE_ADDRESS)
 ART_HOST_CFLAGS += -DART_DEFAULT_INSTRUCTION_SET_FEATURES=default
 ART_HOST_CFLAGS += $(ART_DEFAULT_GC_TYPE_CFLAGS)
+ART_HOST_CFLAGS += $(MTK_CFLAGS)
 
 ifndef LIBART_IMG_TARGET_BASE_ADDRESS
   $(error LIBART_IMG_TARGET_BASE_ADDRESS unset)
 endif
 ART_TARGET_CFLAGS := $(art_cflags) -DART_TARGET -DART_BASE_ADDRESS=$(LIBART_IMG_TARGET_BASE_ADDRESS)
+ART_TARGET_CFLAGS += $(MTK_CFLAGS)
 
 ifndef LIBART_IMG_HOST_MIN_BASE_ADDRESS_DELTA
   LIBART_IMG_HOST_MIN_BASE_ADDRESS_DELTA=-0x1000000

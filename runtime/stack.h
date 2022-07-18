@@ -20,6 +20,10 @@
 #include <stdint.h>
 #include <string>
 
+#ifdef MTK_DEBUG_REF_TABLE
+#include <list>
+#endif
+
 #include "dex_file.h"
 #include "gc_root.h"
 #include "instruction_set.h"
@@ -29,6 +33,14 @@
 #include "verify_object.h"
 
 namespace art {
+
+#ifdef MTK_DEBUG_REF_TABLE
+typedef std::list<mirror::ArtMethod*> BacktraceList;
+#endif
+
+#ifdef MTK_ART_COMMON
+class RootCallbackVisitor;
+#endif
 
 namespace mirror {
   class ArtMethod;
@@ -40,6 +52,9 @@ class ShadowFrame;
 class HandleScope;
 class ScopedObjectAccess;
 class Thread;
+#ifdef MTK_ART_COMMON
+class MethodHelper;
+#endif
 
 // The kind of vreg being accessed in calls to Set/GetVReg.
 enum VRegKind {
@@ -518,6 +533,11 @@ class StackVisitor {
   void WalkStack(bool include_transitions = false)
       SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
 
+#ifdef MTK_DEBUG_REF_TABLE
+  void RecordStackTrace(Thread* thread, BacktraceList &backtrace)
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+#endif
+
   mirror::ArtMethod* GetMethod() const SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
     if (cur_shadow_frame_ != nullptr) {
       return cur_shadow_frame_->GetMethod();
@@ -606,6 +626,50 @@ class StackVisitor {
                    VRegKind kind_lo, VRegKind kind_hi)
       SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
 
+  #ifdef MTK_ART_COMMON
+  bool ScanLiveReferences(mirror::ArtMethod* m, const RootCallbackVisitor* visitor)
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+
+  // 5 arguments
+  bool GetVReg(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind, uint32_t* val,
+      const uintptr_t native_pc_offset) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+
+  // Change prototype
+  // Call of overloaded 'GetVReg(art::mirror::ArtMethod*&, uint16_t&, art::VRegKind, int)' is ambiguous
+  // 4 arguments
+  uint32_t GetVReg(mirror::ArtMethod* m, uint16_t vreg, const uintptr_t native_pc_offset,
+                   VRegKind kind) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+    uint32_t val;
+    bool success = GetVReg(m, vreg, kind, &val, native_pc_offset);
+    return (success ? val : 0);
+  }
+
+  // 6 arguments
+  bool GetVRegPair(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind_lo,
+                   VRegKind kind_hi, uint64_t* val,
+                   const uintptr_t native_pc_offset) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+
+  // Change prototype
+  // Call of overloaded 'GetVReg(art::mirror::ArtMethod*&, uint16_t&, art::VRegKind, art::VRegKind, int)' is ambiguous
+  // 5 arguments
+  uint64_t GetVRegPair(mirror::ArtMethod* m, uint16_t vreg, const uintptr_t native_pc_offset,
+                   VRegKind kind_lo, VRegKind kind_hi) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+    uint64_t val;
+    bool success = GetVRegPair(m, vreg, kind_lo, kind_hi, &val, native_pc_offset);
+    return (success ? val : 0);
+  }
+  bool FindVReg(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind,
+                const uint8_t* reg_bitmap, uint32_t* home) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+  bool FindVRegPair(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind_lo,
+                    VRegKind kind_hi, const uint8_t* reg_bitmap, uint64_t* home) const
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+  #endif
+
   uintptr_t* GetGPRAddress(uint32_t reg) const;
 
   // This is a fast-path for getting/setting values in a quick frame.
@@ -626,47 +690,51 @@ class StackVisitor {
   /*
    * Return sp-relative offset for a Dalvik virtual register, compiler
    * spill or Method* in bytes using Method*.
-   * Note that (reg >= 0) refers to a Dalvik register, (reg == -1)
-   * denotes an invalid Dalvik register, (reg == -2) denotes Method*
-   * and (reg <= -3) denotes a compiler temporary. A compiler temporary
-   * can be thought of as a virtual register that does not exist in the
-   * dex but holds intermediate values to help optimizations and code
-   * generation. A special compiler temporary is one whose location
-   * in frame is well known while non-special ones do not have a requirement
-   * on location in frame as long as code generator itself knows how
-   * to access them.
+   * Note that (reg == -1) denotes an invalid Dalvik register. For the
+   * positive values, the Dalvik registers come first, followed by the
+   * Method*, followed by other special temporaries if any, followed by
+   * regular compiler temporary. As of now we only have the Method* as
+   * as a special compiler temporary.
+   * A compiler temporary can be thought of as a virtual register that
+   * does not exist in the dex but holds intermediate values to help
+   * optimizations and code generation. A special compiler temporary is
+   * one whose location in frame is well known while non-special ones
+   * do not have a requirement on location in frame as long as code
+   * generator itself knows how to access them.
    *
-   *     +---------------------------+
-   *     | IN[ins-1]                 |  {Note: resides in caller's frame}
-   *     |       .                   |
-   *     | IN[0]                     |
-   *     | caller's ArtMethod        |  ... StackReference<ArtMethod>
-   *     +===========================+  {Note: start of callee's frame}
-   *     | core callee-save spill    |  {variable sized}
-   *     +---------------------------+
-   *     | fp callee-save spill      |
-   *     +---------------------------+
-   *     | filler word               |  {For compatibility, if V[locals-1] used as wide
-   *     +---------------------------+
-   *     | V[locals-1]               |
-   *     | V[locals-2]               |
-   *     |      .                    |
-   *     |      .                    |  ... (reg == 2)
-   *     | V[1]                      |  ... (reg == 1)
-   *     | V[0]                      |  ... (reg == 0) <---- "locals_start"
-   *     +---------------------------+
-   *     | Compiler temp region      |  ... (reg <= -3)
-   *     |                           |
-   *     |                           |
-   *     +---------------------------+
-   *     | stack alignment padding   |  {0 to (kStackAlignWords-1) of padding}
-   *     +---------------------------+
-   *     | OUT[outs-1]               |
-   *     | OUT[outs-2]               |
-   *     |       .                   |
-   *     | OUT[0]                    |
-   *     | StackReference<ArtMethod> |  ... (reg == -2) <<== sp, 16-byte aligned
-   *     +===========================+
+   *     +-------------------------------+
+   *     | IN[ins-1]                     |  {Note: resides in caller's frame}
+   *     |       .                       |
+   *     | IN[0]                         |
+   *     | caller's ArtMethod            |  ... StackReference<ArtMethod>
+   *     +===============================+  {Note: start of callee's frame}
+   *     | core callee-save spill        |  {variable sized}
+   *     +-------------------------------+
+   *     | fp callee-save spill          |
+   *     +-------------------------------+
+   *     | filler word                   |  {For compatibility, if V[locals-1] used as wide
+   *     +-------------------------------+
+   *     | V[locals-1]                   |
+   *     | V[locals-2]                   |
+   *     |      .                        |
+   *     |      .                        |  ... (reg == 2)
+   *     | V[1]                          |  ... (reg == 1)
+   *     | V[0]                          |  ... (reg == 0) <---- "locals_start"
+   *     +-------------------------------+
+   *     | stack alignment padding       |  {0 to (kStackAlignWords-1) of padding}
+   *     +-------------------------------+
+   *     | Compiler temp region          |  ... (reg >= max_num_special_temps)
+   *     |      .                        |
+   *     |      .                        |
+   *     | V[max_num_special_temps + 1]  |
+   *     | V[max_num_special_temps + 0]  |
+   *     +-------------------------------+
+   *     | OUT[outs-1]                   |
+   *     | OUT[outs-2]                   |
+   *     |       .                       |
+   *     | OUT[0]                        |
+   *     | StackReference<ArtMethod>     |  ... (reg == num_total_code_regs == special_temp_value) <<== sp, 16-byte aligned
+   *     +===============================+
    */
   static int GetVRegOffset(const DexFile::CodeItem* code_item,
                            uint32_t core_spills, uint32_t fp_spills,

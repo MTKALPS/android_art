@@ -141,7 +141,11 @@ mirror::Object* StackVisitor::GetThisObject() const {
       return nullptr;
     } else {
       uint16_t reg = code_item->registers_size_ - code_item->ins_size_;
+#ifdef MTK_ART_COMMON
+      return reinterpret_cast<mirror::Object*>(GetVReg(m, reg, 0, kReferenceVReg));
+#else
       return reinterpret_cast<mirror::Object*>(GetVReg(m, reg, kReferenceVReg));
+#endif
     }
   }
 }
@@ -150,6 +154,20 @@ size_t StackVisitor::GetNativePcOffset() const {
   DCHECK(!IsShadowFrame());
   return GetMethod()->NativePcOffset(cur_quick_frame_pc_);
 }
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+bool StackVisitor::ScanLiveReferences(mirror::ArtMethod* m,
+                                      const RootCallbackVisitor* visitor) {
+  return false;
+}
+
+__attribute__((weak))
+bool StackVisitor::GetVReg(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind,
+                           uint32_t* val, const uintptr_t native_pc_offset) const {
+  return GetVReg(m, vreg, kind, val);
+}
+#endif
 
 bool StackVisitor::GetVReg(mirror::ArtMethod* m, uint16_t vreg, VRegKind kind,
                            uint32_t* val) const {
@@ -614,5 +632,36 @@ void JavaFrameRootInfo::Describe(std::ostream& os) const {
   os << "Type=" << GetType() << " thread_id=" << GetThreadId() << " location=" <<
       visitor->DescribeLocation() << " vreg=" << vreg_;
 }
+
+#ifdef MTK_DEBUG_REF_TABLE
+#define MAX_BACKTRACE_RECORD_COUNT 8
+void StackVisitor::RecordStackTrace(Thread* thread, BacktraceList &backtrace) {
+
+  int record_cnt = 0;
+  for (const ManagedStack* current_fragment = thread->GetManagedStack(); current_fragment != NULL;
+       current_fragment = current_fragment->GetLink()) {
+    StackReference<mirror::ArtMethod>*cur_quick_frame = current_fragment->GetTopQuickFrame();
+
+    if (cur_quick_frame != NULL) {  // Handle quick stack frames.
+      // Can't be both a shadow and a quick fragment.
+      mirror::ArtMethod* method = cur_quick_frame->AsMirrorPtr();
+      while (method != NULL) {
+        if (!method->IsRuntimeMethod()) {
+          backtrace.push_back(method);
+          record_cnt++;
+          if (record_cnt > MAX_BACKTRACE_RECORD_COUNT) {
+            return;
+          }
+        }
+        size_t frame_size = method->GetFrameSizeInBytes();
+
+        byte* next_frame = reinterpret_cast<byte*>(cur_quick_frame) + frame_size;
+        cur_quick_frame = reinterpret_cast<StackReference<mirror::ArtMethod>*>(next_frame);
+        method = cur_quick_frame->AsMirrorPtr();
+      }
+    }
+  }
+}
+#endif
 
 }  // namespace art

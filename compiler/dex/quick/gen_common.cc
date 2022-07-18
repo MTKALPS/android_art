@@ -27,6 +27,16 @@
 
 namespace art {
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+void MTKGenArithOpIntLit1(CompilationUnit* const cu) {
+}
+
+__attribute__((weak))
+void MTKGenArithOpIntLit2(CompilationUnit* const cu) {
+}
+#endif
+
 // Shortcuts to repeatedly used long types.
 typedef mirror::ObjectArray<mirror::Object> ObjArray;
 typedef mirror::ObjectArray<mirror::Class> ClassArray;
@@ -215,6 +225,38 @@ void Mir2Lir::ForceImplicitNullCheck(RegStorage reg, int opt_flags) {
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+LIR* Mir2Lir::MTKGenNullCheck(RegStorage m_reg, int opt_flags) {
+  return GenNullCheck(m_reg, opt_flags);
+}
+
+__attribute__((weak))
+void Mir2Lir::MTKMarkPossibleNullPointerException(int opt_flags) {
+  MarkPossibleNullPointerException(opt_flags);
+}
+
+__attribute__((weak))
+void Mir2Lir::MTKForceImplicitNullCheck(RegStorage reg, int opt_flags) {
+  ForceImplicitNullCheck(reg, opt_flags);
+}
+
+void Mir2Lir::MTKMarkSafepointPC(LIR* safepoint_pc) {
+}
+
+void Mir2Lir::MTKMarkCurrentOffset(MIR* curr_mir) {
+}
+
+void Mir2Lir::MTKMarkCurrentOffset(uint32_t offset) {
+}
+
+void Mir2Lir::MTKAddPc2DexMapping(LIR* tgt_lir) {
+}
+#endif
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::GenCompareAndBranch(Instruction::Code opcode, RegLocation rl_src1,
                                   RegLocation rl_src2, LIR* taken,
                                   LIR* fall_through) {
@@ -1417,7 +1459,9 @@ void Mir2Lir::GenShiftOpLong(Instruction::Code opcode, RegLocation rl_dest,
   StoreValueWide(rl_dest, rl_result);
 }
 
-
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::GenArithOpInt(Instruction::Code opcode, RegLocation rl_dest,
                             RegLocation rl_src1, RegLocation rl_src2) {
   DCHECK(cu_->instruction_set != kX86 && cu_->instruction_set != kX86_64);
@@ -1708,7 +1752,13 @@ void Mir2Lir::GenArithOpIntLit(Instruction::Code opcode, RegLocation rl_dest, Re
     case Instruction::ADD_INT_2ADDR:
     case Instruction::ADD_INT_LIT8:
     case Instruction::ADD_INT_LIT16:
+      #ifdef MTK_ART_COMMON
+      MTKGenArithOpIntLit1(cu_);
+      #endif
       op = kOpAdd;
+      #ifdef MTK_ART_COMMON
+      MTKGenArithOpIntLit2(cu_);
+      #endif
       break;
     case Instruction::MUL_INT:
     case Instruction::MUL_INT_2ADDR:
@@ -1931,6 +1981,9 @@ void Mir2Lir::GenArithOpLong(Instruction::Code opcode, RegLocation rl_dest,
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::GenConst(RegLocation rl_dest, int value) {
   RegLocation rl_result = EvalLoc(rl_dest, kAnyReg, true);
   LoadConstantNoClobber(rl_result.reg, value);
@@ -2035,6 +2088,9 @@ void Mir2Lir::GenMonitorExit(int opt_flags, RegLocation rl_src) {
 }
 
 /* Generic code for generating a wide constant into a VR. */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::GenConstWide(RegLocation rl_dest, int64_t value) {
   RegLocation rl_result = EvalLoc(rl_dest, kAnyReg, true);
   LoadConstantWide(rl_result.reg, value);

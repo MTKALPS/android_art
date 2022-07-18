@@ -21,6 +21,13 @@
 
 #include <iosfwd>
 #include <string>
+#ifdef MTK_DEBUG_REF_TABLE
+#include <list>
+#include "reference_table.h"
+#include "thread.h"
+#include "stack.h"
+#include "base/mutex.h"
+#endif
 
 #include "base/logging.h"
 #include "base/mutex.h"
@@ -368,6 +375,18 @@ class IndirectReferenceTable {
     return reinterpret_cast<IndirectRef>(uref);
   }
 
+#ifdef MTK_DEBUG_REF_TABLE
+  void AddBacktraceSlot(int slot) SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+    Thread *thread = Thread::Current();
+    BackTraceVisitor bt(thread);
+    bt.RecordStackTrace(thread, btl[slot]);
+  }
+
+  void RemoveBacktraceSlot(int slot) {
+    btl[slot].clear();
+  }
+#endif
+
   // Abort if check_jni is not enabled.
   static void AbortIfNoCheckJNI();
 
@@ -387,6 +406,9 @@ class IndirectReferenceTable {
   const IndirectRefKind kind_;
   /* max #of entries allowed */
   const size_t max_entries_;
+#ifdef MTK_DEBUG_REF_TABLE
+  std::unique_ptr<BacktraceList[]> btl;
+#endif
 };
 
 }  // namespace art

@@ -127,6 +127,14 @@ namespace art {
         block_id_list_ = mir_graph->GetDfsOrder();
       }
 
+      #ifdef MTK_ART_COMMON
+      explicit PreOrderDfsIterator(MIRGraph* mir_graph, GrowableArray<BasicBlockId> *dfs_order)
+          : DataflowIterator(mir_graph, 0, dfs_order->Size()) {
+        idx_ = start_idx_;
+        block_id_list_ = dfs_order;
+      }
+      #endif
+
       /**
        * @brief Get the next BasicBlock depending on iteration order.
        * @param had_change did the user of the iteration change the previous BasicBlock.

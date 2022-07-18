@@ -42,10 +42,22 @@ void ReferenceTable::Add(mirror::Object* obj) {
   DCHECK(obj != NULL);
   VerifyObject(obj);
   if (entries_.size() >= max_size_) {
+#ifdef MTK_DEBUG_REF_TABLE
+    std::ostringstream os;
+    Dump(os);
+    LOG(ERROR) << os.str();
+#endif
     LOG(FATAL) << "ReferenceTable '" << name_ << "' "
                << "overflowed (" << max_size_ << " entries)";
   }
   entries_.push_back(GcRoot<mirror::Object>(obj));
+#ifdef MTK_DEBUG_REF_TABLE
+  Thread *thread = Thread::Current();
+  BackTraceVisitor bt(thread);
+  BacktraceList backtrace_;
+  bt.RecordStackTrace(thread, backtrace_);
+  debug_entries_.push_back(backtrace_);
+#endif
 }
 
 void ReferenceTable::Remove(mirror::Object* obj) {
@@ -54,6 +66,11 @@ void ReferenceTable::Remove(mirror::Object* obj) {
     mirror::Object* entry = entries_[i].Read();
     if (entry == obj) {
       entries_.erase(entries_.begin() + i);
+#ifdef MTK_DEBUG_REF_TABLE
+      BacktraceList *backtrace_ = &debug_entries_[i];
+      backtrace_->clear();
+      debug_entries_.erase(debug_entries_.begin() + i);
+#endif
       return;
     }
   }
@@ -146,6 +163,9 @@ size_t ReferenceTable::Size() const {
 void ReferenceTable::Dump(std::ostream& os) {
   os << name_ << " reference table dump:\n";
   Dump(os, entries_);
+#ifdef MTK_DEBUG_REF_TABLE
+  Dump(os, entries_, debug_entries_);
+#endif
 }
 
 void ReferenceTable::Dump(std::ostream& os, Table& entries) {
@@ -247,5 +267,83 @@ void ReferenceTable::VisitRoots(RootCallback* visitor, void* arg, const RootInfo
     root.VisitRoot(visitor, arg, root_info);
   }
 }
+
+#ifdef MTK_DEBUG_REF_TABLE
+void ReferenceTable::printStacktrace(std::ostream& os, BacktraceList backtrace)
+{
+  mirror::ArtMethod* method;
+
+  for (BacktraceList::iterator list_iter = backtrace.begin(); list_iter != backtrace.end(); list_iter++) {
+    method = (mirror::ArtMethod*) *list_iter;
+    if (method->IsNative()) {
+      os << "  => " << PrettyMethod(method) << "(Native Method)\n";
+    } else {
+      os << "  => " << PrettyMethod(method) << "\n";
+    }
+  }
+}
+
+void ReferenceTable::Dump(std::ostream& os, Table& entries, debugTable& debug_entries) {
+  if (entries.empty()) {
+    return;
+  }
+
+  size_t count = entries.size();
+  os << "  Usage:\n";
+
+  // Make a copy of the table and sort it.
+  Table sorted_entries;
+  for (size_t i = 0; i < entries.size(); ++i) {
+    mirror::Object* entry = entries[i].Read();
+    sorted_entries.push_back(GcRoot<mirror::Object>(entry));
+  }
+  std::sort(sorted_entries.begin(), sorted_entries.end(), ObjectComparator());
+
+  // Remove any uninteresting stuff from the list. The sort moved them all to the end.
+  while (!sorted_entries.empty() && sorted_entries.back().IsNull()) {
+    sorted_entries.pop_back();
+  }
+  while (!sorted_entries.empty() &&
+         sorted_entries.back().Read<kWithoutReadBarrier>() == kClearedJniWeakGlobal) {
+    sorted_entries.pop_back();
+  }
+  if (sorted_entries.empty()) {
+    return;
+  }
+
+  // Dump a summary of the whole table.
+  size_t equiv = 0;
+  size_t identical = 0;
+  size_t idx;
+  for (idx = 1; idx < count; idx++) {
+    mirror::Object* prev = sorted_entries[idx-1].Read<kWithoutReadBarrier>();
+    mirror::Object* current = sorted_entries[idx].Read<kWithoutReadBarrier>();
+    size_t element_count = GetElementCount(prev);
+    if (debug_entries[idx] != debug_entries[idx - 1])  {
+        DumpSummaryLine(os, prev, element_count, identical, equiv);
+        printStacktrace(os, debug_entries[idx - 1]);
+        equiv = identical = 0;
+    } else {
+      if (current == prev) {
+        // Same reference, added more than once.
+        identical++;
+      } else if (current->GetClass() == prev->GetClass() && GetElementCount(current) == element_count) {
+        // Same class / element count, different object.
+        equiv++;
+      } else {
+        // Different class.
+        DumpSummaryLine(os, prev, element_count, identical, equiv);
+        printStacktrace(os, debug_entries[idx - 1]);
+        equiv = identical = 0;
+      }
+    }
+  }
+  // Handle the last entry.
+  DumpSummaryLine(os, sorted_entries.back().Read<kWithoutReadBarrier>(),
+                  GetElementCount(sorted_entries.back().Read<kWithoutReadBarrier>()),
+                  identical, equiv);
+  printStacktrace(os, debug_entries[idx - 1]);
+}
+#endif
 
 }  // namespace art

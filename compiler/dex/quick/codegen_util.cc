@@ -84,6 +84,9 @@ void Mir2Lir::MarkSafepointPC(LIR* inst) {
   inst->u.m.def_mask = &kEncodeAll;
   LIR* safepoint_pc = NewLIR0(kPseudoSafepointPC);
   DCHECK(safepoint_pc->u.m.def_mask->Equals(kEncodeAll));
+  #ifdef MTK_ART_COMMON
+  MTKMarkSafepointPC(safepoint_pc);
+  #endif
 }
 
 void Mir2Lir::MarkSafepointPCAfter(LIR* after) {
@@ -98,6 +101,9 @@ void Mir2Lir::MarkSafepointPCAfter(LIR* after) {
     InsertLIRAfter(after, safepoint_pc);
   }
   DCHECK(safepoint_pc->u.m.def_mask->Equals(kEncodeAll));
+  #ifdef MTK_ART_COMMON
+  MTKMarkSafepointPC(safepoint_pc);
+  #endif
 }
 
 /* Remove a LIR from the list. */
@@ -186,6 +192,9 @@ void Mir2Lir::AnnotateDalvikRegAccess(LIR* lir, int reg_id, bool is_load,
 #define DUMP_RESOURCE_MASK(X)
 
 /* Pretty-print a LIR instruction */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::DumpLIRInsn(LIR* lir, unsigned char* base_addr) {
   int offset = lir->offset;
   int dest = lir->operands[0];
@@ -671,6 +680,9 @@ void Mir2Lir::CreateMappingTables() {
                                            static_cast<int32_t>(pc2dex_dalvik_offset));
       pc2dex_offset = tgt_lir->offset;
       pc2dex_dalvik_offset = tgt_lir->dalvik_offset;
+      #ifdef MTK_ART_COMMON
+      MTKAddPc2DexMapping(tgt_lir);
+      #endif
     }
     if (!tgt_lir->flags.is_nop && (tgt_lir->opcode == kPseudoExportedPC)) {
       dex2pc_entries += 1;
@@ -774,9 +786,11 @@ void Mir2Lir::CreateNativeGcMap() {
     native_gc_map_builder.AddEntry(native_offset, references);
   }
 
+  #ifndef MTK_ART_COMMON
   // Maybe not necessary, but this could help prevent errors where we access the verified method
   // after it has been deleted.
   mir_graph_->GetCurrentDexCompilationUnit()->ClearVerifiedMethod();
+  #endif
 }
 
 /* Determine the offset of each literal field */

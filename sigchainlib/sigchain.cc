@@ -126,14 +126,34 @@ extern "C" void InvokeUserSignalHandler(int sig, siginfo_t* info, void* context)
     if (action.sa_handler != NULL) {
       action.sa_handler(sig);
     } else {
-       signal(sig, SIG_DFL);
+       // M: google seems add dummy libsigchain to avoid external module calling sigchain
+       //     and change sigchain.cc to link as static library, but we think sigchain.cc only can work
+       //     as shared library, so workaround to call bionic c sigaction() manually.
+       //signal(sig, SIG_DFL);
+       struct sigaction sa;
+       sigemptyset(&sa.sa_mask);
+       sa.sa_handler = SIG_DFL;
+       sa.sa_flags = action.sa_flags;
+       SigActionFnPtr linked_sigaction = reinterpret_cast<SigActionFnPtr>(linked_sigaction_sym);
+       linked_sigaction(sig, &sa, nullptr);
+       
        raise(sig);
     }
   } else {
     if (action.sa_sigaction != NULL) {
       action.sa_sigaction(sig, info, context);
     } else {
-       signal(sig, SIG_DFL);
+       // M: google seems add dummy libsigchain to avoid external module calling sigchain
+       //     and change sigchain.cc to link as static library, but we think sigchain.cc only can work
+       //     as shared library, so workaround to call bionic c sigaction() manually.
+       //signal(sig, SIG_DFL);
+       struct sigaction sa;
+       sigemptyset(&sa.sa_mask);
+       sa.sa_handler = SIG_DFL;
+       sa.sa_flags = action.sa_flags;
+       SigActionFnPtr linked_sigaction = reinterpret_cast<SigActionFnPtr>(linked_sigaction_sym);
+       linked_sigaction(sig, &sa, nullptr);
+       
        raise(sig);
     }
   }

@@ -21,6 +21,7 @@
 #include "dex/global_value_numbering.h"
 #include "dex/quick/dex_file_method_inliner.h"
 #include "dex/quick/dex_file_to_method_inliner_map.h"
+#include "stack.h"
 #include "utils/scoped_arena_containers.h"
 
 namespace art {
@@ -35,6 +36,9 @@ void MIRGraph::SetConstant(int32_t ssa_reg, int value) {
   constant_values_[ssa_reg] = value;
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void MIRGraph::SetConstantWide(int ssa_reg, int64_t value) {
   is_constant_v_->SetBit(ssa_reg);
   is_constant_v_->SetBit(ssa_reg + 1);
@@ -596,7 +600,10 @@ void MIRGraph::CountChecks(struct BasicBlock* bb) {
   }
 }
 
-/* Try to make common case the fallthrough path. */
+/* Try to make common case the fallthrough path */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 bool MIRGraph::LayoutBlocks(BasicBlock* bb) {
   // TODO: For now, just looking for direct throws.  Consider generalizing for profile feedback.
   if (!bb->explicit_throw) {

@@ -248,6 +248,16 @@ inline void Mir2Lir::SetupResourceMasks(LIR* lir) {
     use_mask.SetBit(ResourceMask::kCCode);
   }
 
+#ifdef MTK_ART_COMMON
+  if (flags & SETS_FCCODES) {
+    def_mask.SetBit(ResourceMask::kFPStatus);
+  }
+
+  if (flags & USES_FCCODES) {
+    use_mask.SetBit(ResourceMask::kFPStatus);
+  }
+#endif
+
   // Handle target-specific actions
   SetupTargetResourceMasks(lir, flags, &use_mask, &def_mask);
 

@@ -1045,8 +1045,14 @@ void Monitor::VisitLocks(StackVisitor* stack_visitor, void (*callback)(mirror::O
     }
 
     uint16_t monitor_register = ((monitor_enter_instruction >> 8) & 0xff);
+#ifdef MTK_ART_COMMON
+    uintptr_t native_pc = m->NativePcOffset(m->ToNativePc(dex_pc));
+    mirror::Object* o = reinterpret_cast<mirror::Object*>(stack_visitor->GetVReg(m, monitor_register,
+                                                                                 native_pc, kReferenceVReg));
+#else
     mirror::Object* o = reinterpret_cast<mirror::Object*>(stack_visitor->GetVReg(m, monitor_register,
                                                                                  kReferenceVReg));
+#endif
     callback(o, callback_context);
   }
 }

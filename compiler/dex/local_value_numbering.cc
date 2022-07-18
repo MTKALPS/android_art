@@ -193,7 +193,11 @@ class LocalValueNumbering::AliasingArrayVersions {
 };
 
 template <typename Map>
-LocalValueNumbering::AliasingValues* LocalValueNumbering::GetAliasingValues(
+LocalValueNumbering::AliasingValues* 
+#ifdef MTK_ART_COMMON
+__attribute__((noinline)) 
+#endif
+    LocalValueNumbering::GetAliasingValues(
     Map* map, const typename Map::key_type& key) {
   auto lb = map->lower_bound(key);
   if (lb == map->end() || map->key_comp()(key, lb->first)) {
@@ -1342,6 +1346,9 @@ void LocalValueNumbering::HandleInvokeOrClInit(MIR* mir) {
   escaped_array_clobber_set_.clear();
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 uint16_t LocalValueNumbering::GetValueNumber(MIR* mir) {
   uint16_t res = kNoValue;
   uint16_t opcode = mir->dalvikInsn.opcode;

@@ -177,6 +177,69 @@ static inline size_t GetBytesPerFprSpillLocation(InstructionSet isa) {
 
 size_t GetStackOverflowReservedBytes(InstructionSet isa);
 
+// NOTE: Workaround, python script doesn't parse the predefined MACRO
+// don't reverse the following enum code
+#ifdef MTK_ART_COMMON
+enum InstructionFeatures {
+  kHwDiv  = 0x1,              // Supports hardware divide.
+  kHwLpae = 0x2,              // Supports Large Physical Address Extension.
+  kHwOutOfOrder = 0x3,        // Supports out-of-order
+};
+
+#define ISA_HW_OUT_OF_ORDER   (1 << kHwOutOfOrder)
+
+// This is a bitmask of supported features per architecture.
+class PACKED(4) InstructionSetFeatures {
+ public:
+  InstructionSetFeatures() : mask_(0) {}
+  explicit InstructionSetFeatures(uint32_t mask) : mask_(mask) {}
+
+  static InstructionSetFeatures GuessInstructionSetFeatures();
+
+  bool HasDivideInstruction() const {
+      return (mask_ & kHwDiv) != 0;
+  }
+
+  void SetHasDivideInstruction(bool v) {
+    mask_ = (mask_ & ~kHwDiv) | (v ? kHwDiv : 0);
+  }
+
+  bool HasOutOfOrder() const {
+    return (mask_ & ISA_HW_OUT_OF_ORDER) != 0;
+  }
+
+  void SetHasOutOfOrder(bool v) {
+    mask_ = (v)? (mask_ | ISA_HW_OUT_OF_ORDER) : (mask_ & (~ISA_HW_OUT_OF_ORDER));
+  }
+
+  bool HasLpae() const {
+    return (mask_ & kHwLpae) != 0;
+  }
+
+  void SetHasLpae(bool v) {
+    mask_ = (mask_ & ~kHwLpae) | (v ? kHwLpae : 0);
+  }
+
+  std::string GetFeatureString() const;
+
+  // Other features in here.
+
+  bool operator==(const InstructionSetFeatures &peer) const {
+    return mask_ == peer.mask_;
+  }
+
+  bool operator!=(const InstructionSetFeatures &peer) const {
+    return mask_ != peer.mask_;
+  }
+
+  bool operator<=(const InstructionSetFeatures &peer) const {
+    return (mask_ & peer.mask_) == mask_;
+  }
+
+ private:
+  uint32_t mask_;
+};
+#else
 enum InstructionFeatures {
   kHwDiv  = 0x1,              // Supports hardware divide.
   kHwLpae = 0x2,              // Supports Large Physical Address Extension.
@@ -225,6 +288,7 @@ class PACKED(4) InstructionSetFeatures {
  private:
   uint32_t mask_;
 };
+#endif
 
 // The following definitions create return types for two word-sized entities that will be passed
 // in registers so that memory operations for the interface trampolines can be avoided. The entities

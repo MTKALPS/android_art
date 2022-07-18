@@ -134,7 +134,7 @@ class ThreadList {
 
   void DumpNativeStacks(std::ostream& os)
       LOCKS_EXCLUDED(Locks::thread_list_lock_);
-
+  
  private:
   uint32_t AllocThreadId(Thread* self);
   void ReleaseThreadId(Thread* self, uint32_t id) LOCKS_EXCLUDED(Locks::allocated_thread_ids_lock_);
@@ -169,7 +169,7 @@ class ThreadList {
   ConditionVariable thread_exit_cond_ GUARDED_BY(Locks::thread_list_lock_);
 
   friend class Thread;
-
+  
   DISALLOW_COPY_AND_ASSIGN(ThreadList);
 };
 

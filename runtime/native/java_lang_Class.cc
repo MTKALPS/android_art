@@ -26,6 +26,8 @@
 #include "ScopedLocalRef.h"
 #include "ScopedUtfChars.h"
 #include "well_known_classes.h"
+#define ATRACE_TAG ATRACE_TAG_DALVIK
+#include <cutils/trace.h>
 
 namespace art {
 
@@ -59,6 +61,7 @@ static jclass Class_classForName(JNIEnv* env, jclass, jstring javaName, jboolean
     return nullptr;
   }
 
+  ATRACE_BEGIN(StringPrintf("Class for name : %s", name.c_str()).c_str());
   std::string descriptor(DotToDescriptor(name.c_str()));
   StackHandleScope<2> hs(soa.Self());
   Handle<mirror::ClassLoader> class_loader(hs.NewHandle(soa.Decode<mirror::ClassLoader*>(javaLoader)));
@@ -75,11 +78,13 @@ static jclass Class_classForName(JNIEnv* env, jclass, jstring javaName, jboolean
       // Make sure allocation didn't fail with an OOME.
       env->Throw(cnfe);
     }
+    ATRACE_END();
     return nullptr;
   }
   if (initialize) {
     class_linker->EnsureInitialized(c, true, true);
   }
+  ATRACE_END();
   return soa.AddLocalReference<jclass>(c.Get());
 }
 

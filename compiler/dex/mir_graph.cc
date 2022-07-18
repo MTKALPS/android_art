@@ -28,12 +28,16 @@
 #include "dex/quick/dex_file_method_inliner.h"
 #include "leb128.h"
 #include "pass_driver_me_post_opt.h"
+#include "stack.h"
 #include "utils/scoped_arena_containers.h"
 
 namespace art {
 
 #define MAX_PATTERN_LEN 5
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 const char* MIRGraph::extended_mir_op_names_[kMirOpLast - kMirOpFirst] = {
   "Phi",
   "Copy",
@@ -65,6 +69,35 @@ const char* MIRGraph::extended_mir_op_names_[kMirOpLast - kMirOpFirst] = {
   "PackedSet",
   "ReserveVectorRegisters",
   "ReturnVectorRegisters",
+#ifdef MTK_ART_COMMON /* Add MIR extension */
+  "MtkExtMIROp1",
+  "MtkExtMIROp2",
+  "MtkExtMIROp3",
+  "MtkExtMIROp4",
+  "MtkExtMIROp5",
+  "MtkExtMIROp6",
+  "MtkExtMIROp7",
+  "MtkExtMIROp8",
+  "MtkExtMIROp9",
+  "MtkExtMIROp10",
+  "MtkExtMIROp11",
+  "MtkExtMIROp12",
+  "MtkExtMIROp13",
+  "MtkExtMIROp14",
+  "MtkExtMIROp15",
+  "MtkExtMIROp16",
+  "MtkExtMIROp17",
+  "MtkExtMIROp18",
+  "MtkExtMIROp19",
+  "MtkExtMIROp20",
+  "MtkExtMIROp21",
+  "MtkExtMIROp22",
+  "MtkExtMIROp23",
+  "MtkExtMIROp24",
+  "MtkExtMIROp25",
+  "MtkExtMIROp26",
+  "MtkExtMIROp27",
+#endif
 };
 
 MIRGraph::MIRGraph(CompilationUnit* cu, ArenaAllocator* arena)
@@ -150,7 +183,6 @@ int MIRGraph::ParseInsn(const uint16_t* code_ptr, MIR::DecodedInstruction* decod
   return inst->SizeInCodeUnits();
 }
 
-
 /* Split an existing block from the specified code offset into two */
 BasicBlock* MIRGraph::SplitBlock(DexOffset code_offset,
                                  BasicBlock* orig_block, BasicBlock** immed_pred_block_p) {
@@ -215,6 +247,9 @@ BasicBlock* MIRGraph::SplitBlock(DexOffset code_offset,
 
   orig_block->last_mir_insn = prev;
   prev->next = nullptr;
+#ifdef MTK_ART_COMMON
+  bottom_block->first_mir_insn->prev = NULL;
+#endif
 
   /*
    * Update the immediate predecessor block pointer so that outgoing edges
@@ -234,6 +269,9 @@ BasicBlock* MIRGraph::SplitBlock(DexOffset code_offset,
          !MIR::DecodedInstruction::IsPseudoMirOp(insn->dalvikInsn.opcode));
   DCHECK_EQ(dex_pc_to_block_map_.Get(insn->offset), orig_block->id);
   MIR* p = insn;
+  #ifdef MTK_ART_COMON
+  p->bb = bottom_block->id;
+  #endif
   dex_pc_to_block_map_.Put(p->offset, bottom_block->id);
   while (p != bottom_block->last_mir_insn) {
     p = p->next;
@@ -539,6 +577,9 @@ BasicBlock* MIRGraph::ProcessCanSwitch(BasicBlock* cur_block, MIR* insn, DexOffs
 }
 
 /* Process instructions with the kThrow flag */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 BasicBlock* MIRGraph::ProcessCanThrow(BasicBlock* cur_block, MIR* insn, DexOffset cur_offset,
                                       int width, int flags, ArenaBitVector* try_block_addr,
                                       const uint16_t* code_ptr, const uint16_t* code_end) {
@@ -769,6 +810,11 @@ void MIRGraph::InlineMethod(const DexFile::CodeItem* code_item, uint32_t access_
       }
     } else {
       cur_block->AppendMIR(insn);
+      #ifdef MTK_ART_COMMON
+      if (opcode == Instruction::MOVE_EXCEPTION) {
+        cur_block->implicit_exception_block = true;
+      }
+      #endif
     }
 
     // Associate the starting dex_pc for this opcode with its containing basic block.
@@ -895,7 +941,11 @@ void MIRGraph::DumpCFG(const char* dir_prefix, bool all_blocks, const char *suff
   int num_blocks = all_blocks ? GetNumBlocks() : num_reachable_blocks_;
   int idx;
 
+#ifdef MTK_ART_COMMON
+  for (idx = 1; idx < num_blocks; idx++) {
+#else
   for (idx = 0; idx < num_blocks; idx++) {
+#endif
     int block_idx = all_blocks ? idx : dfs_order_->Get(idx);
     BasicBlock* bb = GetBasicBlock(block_idx);
     if (bb == NULL) continue;
@@ -1061,10 +1111,19 @@ void BasicBlock::InsertMIRListAfter(MIR* insert_after, MIR* first_list_mir, MIR*
   if (insert_after == nullptr) {
     first_mir_insn = first_list_mir;
     last_mir_insn = last_list_mir;
+    #ifdef MTK_ART_COMMON
+    first_list_mir->prev = nullptr;
+    #endif
     last_list_mir->next = nullptr;
   } else {
     MIR* after_list = insert_after->next;
     insert_after->next = first_list_mir;
+    #ifdef MTK_ART_COMMON
+    first_list_mir->prev = insert_after;
+    if (after_list != nullptr) {
+      after_list->prev = last_list_mir;
+    }
+    #endif
     last_list_mir->next = after_list;
     if (after_list == nullptr) {
       last_mir_insn = last_list_mir;
@@ -1128,15 +1187,26 @@ void BasicBlock::InsertMIRListBefore(MIR* insert_before, MIR* first_list_mir, MI
   if (insert_before == nullptr) {
     first_mir_insn = first_list_mir;
     last_mir_insn = last_list_mir;
+    #ifdef MTK_ART_COMMON
+    first_list_mir->prev = nullptr;
+    #endif
     last_list_mir->next = nullptr;
   } else {
     if (first_mir_insn == insert_before) {
+      #ifdef MTK_ART_COMMON
+      first_list_mir->prev = nullptr;
+      insert_before->prev = last_list_mir;
+      #endif
       last_list_mir->next = first_mir_insn;
       first_mir_insn = first_list_mir;
     } else {
       // Find the preceding MIR.
       MIR* before_list = FindPreviousMIR(insert_before);
       DCHECK(before_list != nullptr);
+      #ifdef MTK_ART_COMMON
+      first_list_mir->prev = before_list;
+      insert_before->prev = last_list_mir;
+      #endif
       before_list->next = first_list_mir;
       last_list_mir->next = insert_before;
     }
@@ -1185,6 +1255,9 @@ bool BasicBlock::RemoveMIRList(MIR* first_list_mir, MIR* last_list_mir) {
     first_mir_insn = after_list;
   } else {
     before_list->next = after_list;
+    #ifdef MTK_ART_COMMON
+    after_list->prev = before_list;
+    #endif
   }
 
   // If there is nothing after the list, before_list is last_mir.
@@ -1299,7 +1372,7 @@ char* MIRGraph::GetDalvikDisassembly(const MIR* mir) {
     for (int i = 0; i < uses; i++) {
       str.append(
           StringPrintf(" %s", GetSSANameWithConst(ssa_rep->uses[i], show_singles).c_str()));
-      if (!show_singles && (reg_location_ != NULL) && reg_location_[i].wide) {
+      if (!show_singles && (reg_location_ != NULL) && reg_location_[ssa_rep->uses[i]].wide) {
         // For the listing, skip the high sreg.
         i++;
       }
@@ -1440,6 +1513,22 @@ void MIRGraph::DumpMIRGraph() {
       LOG(INFO) << "  Fallthrough : block " << bb->fall_through
                 << " (0x" << std::hex << GetBasicBlock(bb->fall_through)->start_offset << ")";
     }
+#ifdef MTK_ART_COMMON
+    if (bb->successor_block_list_type != kNotUsed) {
+      GrowableArray<SuccessorBlockInfo*>::Iterator iterator(bb->successor_blocks);
+      while (true) {
+        SuccessorBlockInfo *sbi = iterator.Next();
+        if (sbi == NULL) {
+          break;
+        }
+        BasicBlock* succ = GetBasicBlock(sbi->block);
+        if (succ) {
+          LOG(INFO) << "  Successor List : block " << succ->id
+                    << " (0x" << std::hex << succ->start_offset << ")";
+        }
+      }
+    }
+#endif
   }
 }
 
@@ -1478,6 +1567,10 @@ CallInfo* MIRGraph::NewMemCallInfo(BasicBlock* bb, MIR* mir, InvokeType type,
 // Allocate a new MIR.
 MIR* MIRGraph::NewMIR() {
   MIR* mir = new (arena_) MIR();
+#ifdef MTK_ART_COMMON
+  mir->su = nullptr;
+  mir->new_offset = 0;
+#endif
   return mir;
 }
 
@@ -2170,6 +2263,9 @@ BasicBlock* MIRGraph::CreateNewBB(BBType block_type) {
   return res;
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void MIRGraph::CalculateBasicBlockInformation() {
   PassDriverMEPostOpt driver(cu_);
   driver.Launch();
@@ -2179,4 +2275,114 @@ void MIRGraph::InitializeBasicBlockData() {
   num_blocks_ = block_list_.Size();
 }
 
+#ifdef MTK_ART_COMMON
+int MIR::DecodedInstruction::FlagsOf() const {
+  // Calculate new index.
+  int idx = static_cast<int>(opcode) - kNumPackedOpcodes;
+
+  // Check if it is an extended or not.
+  if (idx < 0) {
+    return Instruction::FlagsOf(opcode);
+  }
+
+  // For extended, we use a switch.
+  switch (static_cast<int>(opcode)) {
+    case kMirOpPhi:
+      return Instruction::kContinue;
+    case kMirOpCopy:
+      return Instruction::kContinue;
+    case kMirOpFusedCmplFloat:
+      return Instruction::kContinue | Instruction::kBranch;
+    case kMirOpFusedCmpgFloat:
+      return Instruction::kContinue | Instruction::kBranch;
+    case kMirOpFusedCmplDouble:
+      return Instruction::kContinue | Instruction::kBranch;
+    case kMirOpFusedCmpgDouble:
+      return Instruction::kContinue | Instruction::kBranch;
+    case kMirOpFusedCmpLong:
+      return Instruction::kContinue | Instruction::kBranch;
+    case kMirOpNop:
+      return Instruction::kContinue;
+    case kMirOpNullCheck:
+      return Instruction::kContinue | Instruction::kThrow;
+    case kMirOpRangeCheck:
+      return Instruction::kContinue | Instruction::kThrow;
+    case kMirOpDivZeroCheck:
+      return Instruction::kContinue | Instruction::kThrow;
+    case kMirOpCheck:
+      return Instruction::kContinue | Instruction::kThrow;
+    case kMirOpCheckPart2:
+      return Instruction::kContinue;
+    case kMirOpSelect:
+      return Instruction::kContinue;
+    case kMirOpConstVector:
+      return Instruction::kContinue;
+    case kMirOpMoveVector:
+      return Instruction::kContinue;
+    case kMirOpPackedMultiply:
+      return Instruction::kContinue;
+    case kMirOpPackedAddition:
+      return Instruction::kContinue;
+    case kMirOpPackedSubtract:
+      return Instruction::kContinue;
+    case kMirOpPackedShiftLeft:
+      return Instruction::kContinue;
+    case kMirOpPackedSignedShiftRight:
+      return Instruction::kContinue;
+    case kMirOpPackedUnsignedShiftRight:
+      return Instruction::kContinue;
+    case kMirOpPackedAnd:
+      return Instruction::kContinue;
+    case kMirOpPackedOr:
+      return Instruction::kContinue;
+    case kMirOpPackedXor:
+      return Instruction::kContinue;
+    case kMirOpPackedAddReduce:
+      return Instruction::kContinue;
+    case kMirOpPackedReduce:
+      return Instruction::kContinue;
+    case kMirOpPackedSet:
+      return Instruction::kContinue;
+    case kMirOpReserveVectorRegisters:
+      return Instruction::kContinue;
+    case kMirOpReturnVectorRegisters:
+      return Instruction::kContinue;
+    /* Add MIR extension */
+    case kMtkExtMIROp1:    // MTK OPT Extension
+    case kMtkExtMIROp2:    // MTK OPT Extension
+    case kMtkExtMIROp3:    // MTK OPT Extension
+    case kMtkExtMIROp4:    // MTK OPT Extension
+    case kMtkExtMIROp5:    // MTK OPT Extension
+    case kMtkExtMIROp6:    // MTK OPT Extension
+    case kMtkExtMIROp7:    // MTK OPT Extension
+    case kMtkExtMIROp8:    // MTK OPT Extension
+    case kMtkExtMIROp9:    // MTK OPT Extension
+    case kMtkExtMIROp10:   // MTK OPT Extension
+    case kMtkExtMIROp11:   // MTK OPT Extension
+    case kMtkExtMIROp12:   // MTK OPT Extension
+    case kMtkExtMIROp13:   // MTK OPT Extension
+    case kMtkExtMIROp14:   // MTK OPT Extension
+    case kMtkExtMIROp15:   // MTK OPT Extension
+    case kMtkExtMIROp16:   // MTK OPT Extension
+    case kMtkExtMIROp17:   // MTK OPT Extension
+    case kMtkExtMIROp18:   // MTK OPT Extension
+    case kMtkExtMIROp19:   // MTK OPT Extension
+    case kMtkExtMIROp20:   // MTK OPT Extension
+    case kMtkExtMIROp21:   // MTK OPT Extension
+    case kMtkExtMIROp22:   // MTK OPT Extension
+    case kMtkExtMIROp23:   // MTK OPT Extension
+    case kMtkExtMIROp24:   // MTK OPT Extension
+    case kMtkExtMIROp25:   // MTK OPT Extension
+    case kMtkExtMIROp26:   // MTK OPT Extension
+    case kMtkExtMIROp27:   // MTK OPT Extension
+      return 0;
+    default:
+      LOG(WARNING) << "ExtendedFlagsOf: Unhandled case: " << static_cast<int> (opcode);
+      return 0;
+  }
+}
+
+__attribute__((weak))
+void MIRGraph::SetConditionalBlock() {}
+#endif
 }  // namespace art

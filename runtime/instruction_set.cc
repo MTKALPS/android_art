@@ -122,6 +122,15 @@ std::string InstructionSetFeatures::GetFeatureString() const {
   if ((mask_ & kHwDiv) != 0) {
     result += "div";
   }
+#ifdef MTK_ART_COMMON
+  if ((mask_ & ISA_HW_OUT_OF_ORDER) != 0) {
+    if (result.size() == 0) {
+      result += "ooo";
+    } else {
+      result += ",ooo";
+    }
+  }
+#endif
   if (result.size() == 0) {
     result = "none";
   }

@@ -673,6 +673,9 @@ class OatDumper {
   void DumpVmap(std::ostream& os, const OatFile::OatMethod& oat_method) {
     const uint8_t* raw_table = oat_method.GetVmapTable();
     if (raw_table != nullptr) {
+      #ifdef MTK_ART_COMMON
+      if (oat_method.DumpExtendedVmapTable(os)) return;
+      #endif
       const VmapTable vmap_table(raw_table);
       bool first = true;
       bool processing_fp = false;
@@ -718,20 +721,40 @@ class OatDumper {
     }
   }
 
+#ifdef MTK_ART_COMMON
+  void DumpGcMapRegisters(std::ostream& os, const OatFile::OatMethod& oat_method,
+                          const DexFile::CodeItem* code_item,
+                          size_t num_regs, const uint8_t* reg_bitmap, size_t native_pc_offset) {
+#else
   void DumpGcMapRegisters(std::ostream& os, const OatFile::OatMethod& oat_method,
                           const DexFile::CodeItem* code_item,
                           size_t num_regs, const uint8_t* reg_bitmap) {
+#endif
     bool first = true;
     for (size_t reg = 0; reg < num_regs; reg++) {
       if (((reg_bitmap[reg / 8] >> (reg % 8)) & 0x01) != 0) {
         if (first) {
           os << "  v" << reg << " (";
+#ifdef MTK_ART_COMMON
+          if (!oat_method.DescribeVRegAtDexPc(os, code_item, reg, kReferenceVReg,
+                                              native_pc_offset, GetInstructionSet())) {
+              DescribeVReg(os, oat_method, code_item, reg, kReferenceVReg);
+          }
+#else
           DescribeVReg(os, oat_method, code_item, reg, kReferenceVReg);
+#endif
           os << ")";
           first = false;
         } else {
           os << ", v" << reg << " (";
+#ifdef MTK_ART_COMMON
+          if (!oat_method.DescribeVRegAtDexPc(os, code_item, reg, kReferenceVReg,
+                                              native_pc_offset, GetInstructionSet())) {
+              DescribeVReg(os, oat_method, code_item, reg, kReferenceVReg);
+          }
+#else
           DescribeVReg(os, oat_method, code_item, reg, kReferenceVReg);
+#endif
           os << ")";
         }
       }
@@ -755,7 +778,12 @@ class OatDumper {
         const uint8_t* native_pc = reinterpret_cast<const uint8_t*>(quick_code) +
             map.GetNativePcOffset(entry);
         os << StringPrintf("%p", native_pc);
+#ifdef MTK_ART_COMMON
+        size_t native_pc_offset = map.GetNativePcOffset(entry);
+        DumpGcMapRegisters(os, oat_method, code_item, map.RegWidth() * 8, map.GetBitMap(entry), native_pc_offset);
+#else
         DumpGcMapRegisters(os, oat_method, code_item, map.RegWidth() * 8, map.GetBitMap(entry));
+#endif
       }
     } else {
       const void* portable_code = oat_method.GetPortableCode();
@@ -764,7 +792,11 @@ class OatDumper {
       for (size_t entry = 0; entry < map.NumEntries(); entry++) {
         uint32_t dex_pc = map.GetDexPc(entry);
         os << StringPrintf("0x%08x", dex_pc);
+#ifdef MTK_ART_COMMON
+        DumpGcMapRegisters(os, oat_method, code_item, map.RegWidth() * 8, map.GetBitMap(entry), dex_pc);
+#else
         DumpGcMapRegisters(os, oat_method, code_item, map.RegWidth() * 8, map.GetBitMap(entry));
+#endif
       }
     }
   }
@@ -825,6 +857,10 @@ class OatDumper {
     const uint8_t* gc_map_raw = oat_method.GetGcMap();
     if (gc_map_raw != nullptr) {
       NativePcOffsetToReferenceMap map(gc_map_raw);
+#ifdef MTK_ART_COMMON
+        if (oat_method.DumpExtendedGcMapAtNativePcOffset(
+                          os, code_item, native_pc_offset, GetInstructionSet())) return;
+#endif
       if (map.HasEntry(native_pc_offset)) {
         size_t num_regs = map.RegWidth() * 8;
         const uint8_t* reg_bitmap = map.FindBitMap(native_pc_offset);
@@ -942,6 +978,11 @@ class OatDumper {
           if (dex_pc != DexFile::kDexNoIndex) {
             DumpGcMapAtNativePcOffset(os, oat_method, code_item, offset);
             if (verifier != nullptr) {
+              #ifdef MTK_ART_COMMON
+              if (oat_method.DumpExtendedVRegsAtDexPc(os, verifier, code_item, dex_pc, offset,
+                                                      GetInstructionSet()))
+                return;
+              #endif
               DumpVRegsAtDexPc(os, verifier, oat_method, code_item, dex_pc);
             }
           }

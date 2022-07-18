@@ -217,6 +217,12 @@ void CheckReferenceResult(mirror::Object* o, Thread* self) {
     return;
   }
   mirror::ArtMethod* m = self->GetCurrentMethod(NULL);
+  if (m == NULL)
+  {
+	 //workaround
+  	 LOG(ERROR) << "Can not get current Method";
+	 return;
+  }
   if (o == kInvalidIndirectRefObject) {
     JniAbortF(NULL, "invalid reference returned from %s", PrettyMethod(m).c_str());
   }

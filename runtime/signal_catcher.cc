@@ -37,6 +37,7 @@
 #include "thread_list.h"
 #include "utils.h"
 
+
 namespace art {
 
 static void DumpCmdLine(std::ostream& os) {
@@ -211,6 +212,9 @@ void* SignalCatcher::Run(void* arg) {
   SignalSet signals;
   signals.Add(SIGQUIT);
   signals.Add(SIGUSR1);
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMMY_PREDUMP)
+  signals.Add(SIGSTKFLT);
+#endif
 
   while (true) {
     int signal_number = signal_catcher->WaitForSignal(self, signals);
@@ -226,6 +230,10 @@ void* SignalCatcher::Run(void* arg) {
     case SIGUSR1:
       signal_catcher->HandleSigUsr1();
       break;
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMMY_PREDUMP)
+    case SIGSTKFLT:
+      break;
+#endif
     default:
       LOG(ERROR) << "Unexpected signal %d" << signal_number;
       break;

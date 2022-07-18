@@ -542,6 +542,16 @@ enum ArmOpcode {
   kThumb2LdrdPcRel8,  // ldrd rt, rt2, pc +-/1024.
   kThumb2LdrdI8,     // ldrd rt, rt2, [rn +-/1024].
   kThumb2StrdI8,     // strd rt, rt2, [rn +-/1024].
+#ifdef MTK_ART_COMMON
+  kThumb2Mls,        // mls [111110110000] rn[19-16] ra[15-12] rd[7-4] [0001] rm[3-0]
+  kThumb2Vmlas,      // vmla.f32 [111011100000] rn[19-16] rd[15-12] [10100000] rm[3-0]
+  kThumb2Vmlad,      // vmla.f64 [111011100000] rn[19-16] rd[15-12] [10110000] rm[3-0]
+  kThumb2PldI12,     // pld [111111000001] rn[19-16] [1111] imm12[11-0]
+  kThumb2AddRRI8MN,  // add rd, rn, #<const> [11110] i [010001] rn[19..16] [0] imm3[14..12] rd[11..8] imm8[7..0].
+  kThumb2AddRRRN,    // add [111010110000] rn[19..16] [0000] rd[11..8] [0000] rm[3..0].
+  kThumb2SubRRI8MN,  // sub rd, rn, #<const> [11110] i [011011] rn[19..16] [0] imm3[14..12] rd[11..8] imm8[7..0].
+  kThumb2SubRRRN,    // sub [111010111010] rn[19..16] [0000] rd[11..8] [0000] rm[3..0].
+#endif
   kArmLast,
 };
 

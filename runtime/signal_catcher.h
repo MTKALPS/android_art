@@ -39,7 +39,6 @@ class SignalCatcher {
                                       Locks::thread_list_lock_,
                                       Locks::thread_suspend_count_lock_);
 
-
  private:
   static void* Run(void* arg);
 

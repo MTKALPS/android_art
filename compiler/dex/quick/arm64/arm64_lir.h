@@ -357,6 +357,12 @@ enum ArmOpcode {
   kA64Subs3rRd,      // subs[s111000100] imm_12[21-10] rn[9-5] rd[4-0].
   kA64Tst3rro,       // tst alias of "ands rzr, arg1, arg2, arg3".
   kA64Ubfm4rrdd,     // ubfm[s10100110] N[22] imm_r[21-16] imm_s[15-10] rn[9-5] rd[4-0].
+#ifdef MTK_ART_COMMON
+  kA64Prfmi3wXF,     // prfm [1111100110] imm_12[21-10] rn[9-5] rt[4-0]
+  kA64Madd4rrrr,     // madd [00011011000] rm[20-16] [0] ra[14-10] rn[9-5] rd[4-0].
+  kA64FmaddS4rrrr,   // madd [00011111000] rm[20-16] [0] ra[14-10] rn[9-5] rd[4-0].
+  kA64FmaddD4rrrr,   // madd [00011111010] rm[20-16] [0] ra[14-10] rn[9-5] rd[4-0].
+#endif
   kA64Last,
   kA64NotWide = 0,   // Flag used to select the first instruction variant.
   kA64Wide = 0x1000  // Flag used to select the second instruction variant.

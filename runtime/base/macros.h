@@ -151,8 +151,13 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
 #define UNLIKELY(x)     __builtin_expect((x), false)
 
 // Stringify the argument.
+#ifdef MTK_ART_COMMON
+#define QUOTE(x...) #x
+#define STRINGIFY(x) QUOTE(x)
+#else
 #define QUOTE(x) #x
 #define STRINGIFY(x) QUOTE(x)
+#endif
 
 #ifndef NDEBUG
 #define ALWAYS_INLINE

@@ -19,9 +19,10 @@
 
 #include <stdint.h>
 
+#include "compiler_ir.h"
 #include "dex_file.h"
 #include "dex_instruction.h"
-#include "compiler_ir.h"
+#include "driver/dex_compilation_unit.h"
 #include "invoke_type.h"
 #include "mir_field_info.h"
 #include "mir_method_info.h"
@@ -35,6 +36,9 @@
 namespace art {
 
 class GlobalValueNumbering;
+#ifdef MTK_ART_COMMON
+class SchedUnit;
+#endif
 
 enum InstructionAnalysisAttributePos {
   kUninterestingOp = 0,
@@ -107,6 +111,9 @@ enum DataFlowAttributePos {
   kUsesIField,           // Accesses an instance field (IGET/IPUT).
   kUsesSField,           // Accesses a static field (SGET/SPUT).
   kDoLVN,                // Worth computing local value numbers.
+#ifdef MTK_ART_COMMON
+  kIsLinear,
+#endif
 };
 
 #define DF_NOP                  UINT64_C(0)
@@ -146,6 +153,9 @@ enum DataFlowAttributePos {
 #define DF_IFIELD               (UINT64_C(1) << kUsesIField)
 #define DF_SFIELD               (UINT64_C(1) << kUsesSField)
 #define DF_LVN                  (UINT64_C(1) << kDoLVN)
+#ifdef MTK_ART_COMMON
+#define DF_IS_LINEAR            (UINT64_C(1) << kIsLinear)
+#endif
 
 #define DF_HAS_USES             (DF_UA | DF_UB | DF_UC)
 
@@ -210,11 +220,15 @@ static constexpr bool kLeafOptimization = false;
 struct CompilerTemp {
   int32_t v_reg;      // Virtual register number for temporary.
   int32_t s_reg_low;  // SSA name for low Dalvik word.
+  #ifdef MTK_ART_COMMON
+  int32_t s_reg_high;  // SSA name for high Dalvik word.
+  #endif
 };
 
 enum CompilerTempType {
   kCompilerTempVR,                // A virtual register temporary.
   kCompilerTempSpecialMethodPtr,  // Temporary that keeps track of current method pointer.
+  kCompilerTempBackend,           // Temporary that is used by backend.
 };
 
 // When debug option enabled, records effectiveness of null and range check elimination.
@@ -230,6 +244,9 @@ struct BasicBlockDataFlow {
   ArenaBitVector* use_v;
   ArenaBitVector* def_v;
   ArenaBitVector* live_in_v;
+#ifdef MTK_ART_COMMON
+  ArenaBitVector* ssa_live_in_v;
+#endif
   ArenaBitVector* phi_v;
   int32_t* vreg_to_ssa_map_exit;
   ArenaBitVector* ending_check_v;  // For null check and class init check elimination.
@@ -343,12 +360,24 @@ struct MIR {
     bool IsLinear() const {
       return !IsPseudoMirOp(opcode) && (Instruction::FlagsOf(opcode) & (Instruction::kAdd | Instruction::kSubtract)) != 0;
     }
+
+    #ifdef MTK_ART_COMMON
+    int FlagsOf() const;
+    #endif
   } dalvikInsn;
 
   NarrowDexOffset offset;         // Offset of the instruction in code units.
   uint16_t optimization_flags;
   int16_t m_unit_index;           // From which method was this MIR included
   BasicBlockId bb;
+  #ifdef MTK_ART_COMMON
+  MIR* prev;
+  uint32_t seq_num;
+  uint32_t mtk_optimization_flags;
+  uint16_t lvn;
+  SchedUnit* su;
+  NarrowDexOffset new_offset;
+  #endif
   MIR* next;
   SSARepresentation* ssa_rep;
   union {
@@ -406,6 +435,9 @@ struct BasicBlock {
   bool terminated_by_return:1;  // Block ends with a Dalvik return opcode.
   bool dominates_return:1;      // Is a member of return extended basic block.
   bool use_lvn:1;               // Run local value numbering on this block.
+#ifdef MTK_ART_COMMON
+  bool implicit_exception_block:1;  // Start from move-exception
+#endif
   MIR* first_mir_insn;
   MIR* last_mir_insn;
   BasicBlockDataFlow* data_flow_info;
@@ -539,7 +571,11 @@ const RegLocation bad_loc = {kLocDalvikFrame, 0, 0, 0, 0, 0, 0, 0, 0, RegStorage
 class MIRGraph {
  public:
   MIRGraph(CompilationUnit* cu, ArenaAllocator* arena);
+#ifdef MTK_ART_COMMON
+  virtual ~MIRGraph();
+#else
   ~MIRGraph();
+#endif
 
   /*
    * Examine the graph to determine whether it's worthwile to spend the time compiling
@@ -915,13 +951,29 @@ class MIRGraph {
     return (vreg >= cu_->num_regs);
   }
 
+  #ifdef MTK_ART_COMMON
+  uint32_t GetNumOfCodeVRs() const {
+    return current_code_item_->registers_size_;
+  }
+
+  uint32_t GetNumOfCodeAndUsedTempVRs() const {
+    // Include all of the possible temps so that no structures overflow when initialized.
+    return GetNumOfCodeVRs() + GetNumUsedCompilerTemps();
+  }
+  #endif
+
   void DumpCheckStats();
   MIR* FindMoveResult(BasicBlock* bb, MIR* mir);
   int SRegToVReg(int ssa_reg) const;
   void VerifyDataflow();
   void CheckForDominanceFrontier(BasicBlock* dom_bb, const BasicBlock* succ_bb);
   void EliminateNullChecksAndInferTypesStart();
+#ifdef MTK_ART_COMMON
+  virtual
   bool EliminateNullChecksAndInferTypes(BasicBlock* bb);
+#else
+  bool EliminateNullChecksAndInferTypes(BasicBlock* bb);
+#endif
   void EliminateNullChecksAndInferTypesEnd();
   bool EliminateClassInitChecksGate();
   bool EliminateClassInitChecks(BasicBlock* bb);
@@ -1046,6 +1098,11 @@ class MIRGraph {
   void CompilerInitializeSSAConversion();
   void InsertPhiNodes();
   void DoDFSPreOrderSSARename(BasicBlock* block);
+  #ifdef MTK_ART_COMMON
+  virtual void SetInvokeInline() {}
+  void SetConditionalBlock();
+  #endif
+
 
   /*
    * IsDebugBuild sanity check: keep track of the Dex PCs for catch entries so that later on
@@ -1119,7 +1176,12 @@ class MIRGraph {
   void SetConstant(int32_t ssa_reg, int value);
   void SetConstantWide(int ssa_reg, int64_t value);
   int GetSSAUseCount(int s_reg);
+#ifdef MTK_ART_COMMON
+  virtual
   bool BasicBlockOpt(BasicBlock* bb);
+#else
+  bool BasicBlockOpt(BasicBlock* bb);
+#endif
   bool BuildExtendedBBList(struct BasicBlock* bb);
   bool FillDefBlockMatrix(BasicBlock* bb);
   void InitializeDominationInfo(BasicBlock* bb);
@@ -1205,6 +1267,9 @@ class MIRGraph {
   friend class GlobalValueNumberingTest;
   friend class LocalValueNumberingTest;
   friend class TopologicalSortOrderTest;
+#ifdef MTK_ART_COMMON
+  friend class MTK_MIRGraph;
+#endif
 };
 
 }  // namespace art

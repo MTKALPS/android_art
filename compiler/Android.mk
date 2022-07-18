@@ -257,6 +257,15 @@ $$(ENUM_OPERATOR_OUT_GEN): $$(GENERATED_SRC_DIR)/%_operator_out.cc : $(LOCAL_PAT
   endif
   LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_build.mk
   LOCAL_ADDITIONAL_DEPENDENCIES += $(LOCAL_PATH)/Android.mk
+
+  ifeq ($(MTK_ART_OPT_ENABLE),true)
+    ifeq ($$(art_ndebug_or_debug),debug)
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-artd
+    else
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art
+    endif
+  endif
+
   ifeq ($$(art_target_or_host),target)
     LOCAL_SHARED_LIBRARIES += libcutils libvixl
     include $(BUILD_SHARED_LIBRARY)

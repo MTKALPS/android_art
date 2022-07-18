@@ -21,6 +21,40 @@
 
 namespace art {
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+bool MTKOpRegRegImm(CompilationUnit* const cu) {
+  return false;
+}
+
+__attribute__((weak))
+void GetMTKOpcode(OpKind op, ArmOpcode* opcode,
+                  bool thumb_form, CompilationUnit* const cu) {
+  if (op == kOpAdd) {
+    *opcode = (thumb_form) ? kThumbAddRRR : kThumb2AddRRR;
+  } else if (op == kOpSub) {
+    *opcode = (thumb_form) ? kThumbSubRRR : kThumb2SubRRR;
+  }
+}
+
+__attribute__((weak))
+void GetMTKOpcode(OpKind op, ArmOpcode* opcode,
+                  ArmOpcode* alt_opcode, CompilationUnit* const cu) {
+  if (op == kOpSub) {
+    *opcode = kThumb2SubRRI8M;
+    *alt_opcode = kThumb2SubRRR;
+  } else {
+    *opcode = kThumb2AddRRI8M;
+    *alt_opcode = kThumb2AddRRR;
+  }
+}
+
+__attribute__((weak))
+ArmOpcode GetMTKOpcode(ArmOpcode opcode, CompilationUnit* const cu) {
+  return opcode;
+}
+#endif
+
 /* This file contains codegen for the Thumb ISA. */
 
 static int32_t EncodeImmSingle(int32_t value) {
@@ -317,10 +351,18 @@ LIR* ArmMir2Lir::OpRegRegShift(OpKind op, RegStorage r_dest_src1, RegStorage r_s
       opcode = (thumb_form) ? kThumbRorRR : kThumb2RorRRR;
       break;
     case kOpAdd:
+      #ifdef MTK_ART_COMMON
+      GetMTKOpcode(op, &opcode, thumb_form, cu_);
+      #else
       opcode = (thumb_form) ? kThumbAddRRR : kThumb2AddRRR;
+      #endif
       break;
     case kOpSub:
+      #ifdef MTK_ART_COMMON
+      GetMTKOpcode(op, &opcode, thumb_form, cu_);
+      #else
       opcode = (thumb_form) ? kThumbSubRRR : kThumb2SubRRR;
+      #endif
       break;
     case kOpRev:
       DCHECK_EQ(shift, 0);
@@ -393,10 +435,18 @@ LIR* ArmMir2Lir::OpRegRegRegShift(OpKind op, RegStorage r_dest, RegStorage r_src
   bool thumb_form = (shift == 0) && r_dest.Low8() && r_src1.Low8() && r_src2.Low8();
   switch (op) {
     case kOpAdd:
+      #ifdef MTK_ART_COMMON
+      GetMTKOpcode(op, &opcode, thumb_form, cu_);
+      #else
       opcode = (thumb_form) ? kThumbAddRRR : kThumb2AddRRR;
+      #endif
       break;
     case kOpSub:
+      #ifdef MTK_ART_COMMON
+      GetMTKOpcode(op, &opcode, thumb_form, cu_);
+      #else
       opcode = (thumb_form) ? kThumbSubRRR : kThumb2SubRRR;
+      #endif
       break;
     case kOpRsub:
       opcode = kThumb2RsubRRR;
@@ -496,7 +546,12 @@ LIR* ArmMir2Lir::OpRegRegImm(OpKind op, RegStorage r_dest, RegStorage r_src1, in
       }
       // Note: intentional fallthrough
     case kOpSub:
+      #ifdef MTK_ART_COMMON
+      if ((all_low_regs && ((abs_value & 0x7) == abs_value)) &&
+          !MTKOpRegRegImm(cu_)) {
+      #else
       if (all_low_regs && ((abs_value & 0x7) == abs_value)) {
+      #endif
         if (op == kOpAdd)
           opcode = (neg) ? kThumbSubRRI3 : kThumbAddRRI3;
         else
@@ -518,6 +573,9 @@ LIR* ArmMir2Lir::OpRegRegImm(OpKind op, RegStorage r_dest, RegStorage r_src1, in
           opcode = (neg) ? kThumb2AddRRI12 : kThumb2SubRRI12;
         return NewLIR3(opcode, r_dest.GetReg(), r_src1.GetReg(), abs_value);
       }
+      #ifdef MTK_ART_COMMON
+      GetMTKOpcode(op, &opcode, &alt_opcode, cu_);
+      #else
       if (op == kOpSub) {
         opcode = kThumb2SubRRI8M;
         alt_opcode = kThumb2SubRRR;
@@ -525,6 +583,7 @@ LIR* ArmMir2Lir::OpRegRegImm(OpKind op, RegStorage r_dest, RegStorage r_src1, in
         opcode = kThumb2AddRRI8M;
         alt_opcode = kThumb2AddRRR;
       }
+      #endif
       break;
     case kOpRsub:
       opcode = kThumb2RsubRRI8M;
@@ -719,8 +778,14 @@ LIR* ArmMir2Lir::LoadBaseIndexed(RegStorage r_base, RegStorage r_index, RegStora
     case kSingle:
       reg_ptr = AllocTemp();
       if (scale) {
+        #ifdef MTK_ART_COMMON
+        NewLIR4(GetMTKOpcode(kThumb2AddRRR, cu_),
+                reg_ptr.GetReg(), r_base.GetReg(), r_index.GetReg(),
+                EncodeShift(kArmLsl, scale));
+        #else
         NewLIR4(kThumb2AddRRR, reg_ptr.GetReg(), r_base.GetReg(), r_index.GetReg(),
                 EncodeShift(kArmLsl, scale));
+        #endif
       } else {
         OpRegRegReg(kOpAdd, reg_ptr, r_base, r_index);
       }
@@ -786,8 +851,14 @@ LIR* ArmMir2Lir::StoreBaseIndexed(RegStorage r_base, RegStorage r_index, RegStor
     case kSingle:
       reg_ptr = AllocTemp();
       if (scale) {
+        #ifdef MTK_ART_COMMON
+        NewLIR4(GetMTKOpcode(kThumb2AddRRR, cu_),
+                reg_ptr.GetReg(), r_base.GetReg(), r_index.GetReg(),
+                EncodeShift(kArmLsl, scale));
+        #else
         NewLIR4(kThumb2AddRRR, reg_ptr.GetReg(), r_base.GetReg(), r_index.GetReg(),
                 EncodeShift(kArmLsl, scale));
+        #endif
       } else {
         OpRegRegReg(kOpAdd, reg_ptr, r_base, r_index);
       }

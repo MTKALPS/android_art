@@ -78,6 +78,11 @@ IndirectReferenceTable::IndirectReferenceTable(size_t initialCount,
   CHECK_EQ(table_mem_map_->Size(), table_bytes);
   table_ = reinterpret_cast<IrtEntry*>(table_mem_map_->Begin());
   CHECK(table_ != nullptr);
+
+#ifdef MTK_DEBUG_REF_TABLE
+  btl.reset(new BacktraceList[maxCount]);
+#endif
+
   segment_state_.all = IRT_FIRST_SEGMENT;
 }
 
@@ -95,6 +100,11 @@ IndirectRef IndirectReferenceTable::Add(uint32_t cookie, mirror::Object* obj) {
   DCHECK_GE(segment_state_.parts.numHoles, prevState.parts.numHoles);
 
   if (topIndex == max_entries_) {
+#ifdef MTK_DEBUG_REF_TABLE
+      std::ostringstream os;
+      Dump(os);
+      LOG(ERROR) << os.str();
+#endif
     LOG(FATAL) << "JNI ERROR (app bug): " << kind_ << " table overflow "
                << "(max=" << max_entries_ << ")\n"
                << MutatorLockedDumpable<IndirectReferenceTable>(*this);
@@ -117,10 +127,16 @@ IndirectRef IndirectReferenceTable::Add(uint32_t cookie, mirror::Object* obj) {
       --pScan;
     }
     index = pScan - table_;
+#ifdef MTK_DEBUG_REF_TABLE
+    AddBacktraceSlot(pScan - table_);
+#endif
     segment_state_.parts.numHoles--;
   } else {
     // Add to the end.
     index = topIndex++;
+#ifdef MTK_DEBUG_REF_TABLE
+    AddBacktraceSlot(topIndex);
+#endif
     segment_state_.parts.topIndex = topIndex;
   }
   table_[index].Add(obj);
@@ -186,6 +202,10 @@ bool IndirectReferenceTable::Remove(uint32_t cookie, IndirectRef iref) {
     }
 
     *table_[idx].GetReference() = GcRoot<mirror::Object>(nullptr);
+#ifdef MTK_DEBUG_REF_TABLE
+    RemoveBacktraceSlot(idx);
+#endif
+
     int numHoles = segment_state_.parts.numHoles - prevState.parts.numHoles;
     if (numHoles != 0) {
       while (--topIndex > bottomIndex && numHoles != 0) {
@@ -223,6 +243,10 @@ bool IndirectReferenceTable::Remove(uint32_t cookie, IndirectRef iref) {
     }
 
     *table_[idx].GetReference() = GcRoot<mirror::Object>(nullptr);
+#ifdef MTK_DEBUG_REF_TABLE
+    RemoveBacktraceSlot(idx);
+#endif
+
     segment_state_.parts.numHoles++;
     if (false) {
       LOG(INFO) << "+++ left hole at " << idx << ", holes=" << segment_state_.parts.numHoles;
@@ -250,6 +274,9 @@ void IndirectReferenceTable::VisitRoots(RootCallback* callback, void* arg,
 void IndirectReferenceTable::Dump(std::ostream& os) const {
   os << kind_ << " table dump:\n";
   ReferenceTable::Table entries;
+#ifdef MTK_DEBUG_REF_TABLE
+  ReferenceTable::debugTable debug_entries;
+#endif
   for (size_t i = 0; i < Capacity(); ++i) {
     mirror::Object* obj = table_[i].GetReference()->Read<kWithoutReadBarrier>();
     if (UNLIKELY(obj == nullptr)) {
@@ -258,12 +285,21 @@ void IndirectReferenceTable::Dump(std::ostream& os) const {
       // ReferenceTable::Dump() will handle kClearedJniWeakGlobal
       // while the read barrier won't.
       entries.push_back(GcRoot<mirror::Object>(obj));
+#ifdef MTK_DEBUG_REF_TABLE
+      debug_entries.push_back(btl[i]);
+#endif
     } else {
       obj = table_[i].GetReference()->Read();
       entries.push_back(GcRoot<mirror::Object>(obj));
+#ifdef MTK_DEBUG_REF_TABLE
+      debug_entries.push_back(btl[i]);
+#endif
     }
   }
   ReferenceTable::Dump(os, entries);
+#ifdef MTK_DEBUG_REF_TABLE
+  ReferenceTable::Dump(os, entries, debug_entries);
+#endif
 }
 
 }  // namespace art

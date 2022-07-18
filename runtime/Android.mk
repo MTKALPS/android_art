@@ -317,6 +317,27 @@ LIBART_ENUM_OPERATOR_OUT_HEADER_FILES := \
   verifier/method_verifier.h
 
 LIBART_CFLAGS :=
+
+ifneq ($(strip $(MTK_EMULATOR_SUPPORT)),yes)
+# MTK: sig 16 handler for ANR predump
+LIBART_CFLAGS += -DMTK_DUMMY_PREDUMP
+# MTK: explicit gc debug mechanism
+#LIBART_CFLAGS += -DMTK_EXPLICIT_GC_DEBUG
+# MTK: let VLOG configurable
+#LIBART_CFLAGS += -DMTK_DEBUG_VLOG
+
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), arm arm64))
+  ifeq ($(TARGET_BUILD_VARIANT), eng)
+    # MTK add dump hprof when OOME
+    #LIBART_CFLAGS += -DMTK_DUMP_HPROF_WHEN_OOME
+    ifneq ($(strip $(MTK_EMULATOR_SUPPORT)), yes)
+      # MTK add dump reference table usage when table overflow
+      #LIBART_CFLAGS += -DMTK_DEBUG_REF_TABLE
+    endif
+  endif
+endif
+endif #MTK_EMULATOR_SUPPORT
+
 ifeq ($(ART_USE_PORTABLE_COMPILER),true)
   LIBART_CFLAGS += -DART_USE_PORTABLE_COMPILER=1
 endif
@@ -446,6 +467,15 @@ $$(ENUM_OPERATOR_OUT_GEN): $$(GENERATED_SRC_DIR)/%_operator_out.cc : $(LOCAL_PAT
   endif
   LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_build.mk
 #  LOCAL_ADDITIONAL_DEPENDENCIES += $$(LOCAL_PATH)/Android.mk
+
+  ifeq ($(MTK_ART_OPT_ENABLE),true)
+    ifeq ($$(art_ndebug_or_debug),debug)
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art-runtimed
+    else
+      LOCAL_WHOLE_STATIC_LIBRARIES += libmtk-art-runtime
+    endif
+  endif
+
 
   ifeq ($$(art_target_or_host),target)
     LOCAL_MODULE_TARGET_ARCH := $$(ART_TARGET_SUPPORTED_ARCH)

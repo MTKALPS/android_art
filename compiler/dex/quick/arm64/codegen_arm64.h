@@ -19,12 +19,17 @@
 
 #include "arm64_lir.h"
 #include "dex/compiler_internals.h"
+#include "dex/quick/mir_to_lir.h"
 
 #include <map>
 
 namespace art {
 
+#ifdef MTK_ART_COMMON
+class Arm64Mir2Lir : public virtual Mir2Lir {
+#else
 class Arm64Mir2Lir FINAL : public Mir2Lir {
+#endif
  protected:
   // TODO: consolidate 64-bit target support.
   class InToRegStorageMapper {
@@ -259,7 +264,18 @@ class Arm64Mir2Lir FINAL : public Mir2Lir {
 
   LIR* InvokeTrampoline(OpKind op, RegStorage r_tgt, QuickEntrypointEnum trampoline) OVERRIDE;
 
- private:
+#ifdef MTK_ART_COMMON
+  int  GetNumAllocatableCoreRegs();
+
+  protected:
+
+    virtual int MTKGenArrayGet1(int data_offset, int scale, bool wide) { return data_offset; }
+    virtual void MTKGenArrayGet2(bool needs_range_check,
+                                 int data_offset, RegStorage reg_ptr) {}
+#else
+
+  private:
+#endif
   /**
    * @brief Given register xNN (dNN), returns register wNN (sNN).
    * @param reg #RegStorage containing a Solo64 input register (e.g. @c x1 or @c d2).
@@ -393,6 +409,9 @@ class Arm64Mir2Lir FINAL : public Mir2Lir {
                      RegLocation rl_src2, bool is_div);
 
   InToRegStorageMapping in_to_reg_storage_mapping_;
+#ifdef MTK_ART_COMMON
+  public:
+#endif
   static const ArmEncodingMap EncodingMap[kA64Last];
 };
 

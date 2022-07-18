@@ -690,7 +690,11 @@ const ArmEncodingMap ArmMir2Lir::EncodingMap[kArmLast] = {
     ENCODING_MAP(kThumb2AdcRRR,  0xeb500000, /* setflags encoding */
                  kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtBitBlt, 3, 0,
                  kFmtShift, -1, -1,
+#ifdef MTK_ART_COMMON
+                 IS_QUAD_OP | REG_DEF0_USE12 | SETS_CCODES | USES_CCODES,
+#else
                  IS_QUAD_OP | REG_DEF0_USE12 | SETS_CCODES,
+#endif
                  "adcs", "!0C, !1C, !2C!3H", 4, kFixupNone),
     ENCODING_MAP(kThumb2AndRRR,  0xea000000,
                  kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtBitBlt, 3, 0,
@@ -828,15 +832,27 @@ const ArmEncodingMap ArmMir2Lir::EncodingMap[kArmLast] = {
                  "it:!1b", "!0c", 2, kFixupNone),
     ENCODING_MAP(kThumb2Fmstat,  0xeef1fa10,
                  kFmtUnused, -1, -1, kFmtUnused, -1, -1, kFmtUnused, -1, -1,
+#ifdef MTK_ART_COMMON
+                 kFmtUnused, -1, -1, NO_OPERAND | SETS_CCODES | USES_FCCODES,
+#else
                  kFmtUnused, -1, -1, NO_OPERAND | SETS_CCODES,
+#endif
                  "fmstat", "", 4, kFixupNone),
     ENCODING_MAP(kThumb2Vcmpd,        0xeeb40b40,
                  kFmtDfp, 22, 12, kFmtDfp, 5, 0, kFmtUnused, -1, -1,
+#ifdef MTK_ART_COMMON
+                 kFmtUnused, -1, -1, IS_BINARY_OP | REG_USE01 | SETS_FCCODES,
+#else
                  kFmtUnused, -1, -1, IS_BINARY_OP | REG_USE01,
+#endif
                  "vcmp.f64", "!0S, !1S", 4, kFixupNone),
     ENCODING_MAP(kThumb2Vcmps,        0xeeb40a40,
                  kFmtSfp, 22, 12, kFmtSfp, 5, 0, kFmtUnused, -1, -1,
+#ifdef MTK_ART_COMMON
+                 kFmtUnused, -1, -1, IS_BINARY_OP | REG_USE01 | SETS_FCCODES,
+#else
                  kFmtUnused, -1, -1, IS_BINARY_OP | REG_USE01,
+#endif
                  "vcmp.f32", "!0s, !1s", 4, kFixupNone),
     ENCODING_MAP(kThumb2LdrPcRel12,       0xf8df0000,
                  kFmtBitBlt, 15, 12, kFmtBitBlt, 11, 0, kFmtUnused, -1, -1,
@@ -1035,6 +1051,45 @@ const ArmEncodingMap ArmMir2Lir::EncodingMap[kArmLast] = {
                  kFmtBitBlt, 7, 0,
                  IS_QUAD_OP | REG_USE0 | REG_USE1 | REG_USE2 | IS_STORE_OFF4,
                  "strd", "!0C, !1C, [!2C, #!3E]", 4, kFixupNone),
+#ifdef MTK_ART_COMMON
+    ENCODING_MAP(kThumb2Mls,  0xfb000010,
+                 kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtBitBlt, 3, 0,
+                 kFmtBitBlt, 15, 12,
+                 IS_QUAD_OP | REG_DEF0 | REG_USE1 | REG_USE2 | REG_USE3,
+                 "mls", "!0C, !1C, !2C, !3C", 4, kFixupNone),
+    ENCODING_MAP(kThumb2Vmlas, 0xee000a00,
+                 kFmtSfp, 22, 12, kFmtSfp, 7, 16, kFmtSfp, 5, 0,
+                 kFmtUnused, -1, -1, IS_TERTIARY_OP | REG_DEF0 | REG_USE0 | REG_USE1 | REG_USE2,
+                 "vmla.s", "!0s, !1s, !2s", 4, kFixupNone),
+    ENCODING_MAP(kThumb2Vmlad, 0xee000b00,
+                 kFmtDfp, 22, 12, kFmtDfp, 7, 16, kFmtDfp, 5, 0,
+                 kFmtUnused, -1, -1, IS_TERTIARY_OP | REG_DEF0 | REG_USE0 | REG_USE1 | REG_USE2,
+                 "vmla.d", "!0S, !1S, !2S", 4, kFixupNone),
+    ENCODING_MAP(kThumb2PldI12, 0xf890f000,
+                 kFmtBitBlt, 19, 16, kFmtBitBlt, 11, 0, kFmtUnused, -1, -1,
+                 kFmtUnused, -1, -1, IS_BINARY_OP | REG_USE0,
+                 "pld", "[!0C, #!1d]", 4, kFixupLoad),
+    ENCODING_MAP(kThumb2AddRRI8MN,  0xf1000000,
+                 kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtModImm, -1, -1,
+                 kFmtUnused, -1, -1,
+                 IS_TERTIARY_OP | REG_DEF0_USE1,
+                 "add", "!0C, !1C, #!2m", 4, kFixupNone),
+    ENCODING_MAP(kThumb2AddRRRN,  0xeb000000, /* setflags encoding */
+                 kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtBitBlt, 3, 0,
+                 kFmtShift, -1, -1,
+                 IS_QUAD_OP | REG_DEF0_USE12,
+                 "add", "!0C, !1C, !2C!3H", 4, kFixupNone),
+    ENCODING_MAP(kThumb2SubRRI8MN,  0xf1a00000,
+                 kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtModImm, -1, -1,
+                 kFmtUnused, -1, -1,
+                 IS_TERTIARY_OP | REG_DEF0_USE1,
+                 "sub", "!0C, !1C, #!2m", 4, kFixupNone),
+    ENCODING_MAP(kThumb2SubRRRN,       0xeba00000, /* setflags enconding */
+                 kFmtBitBlt, 11, 8, kFmtBitBlt, 19, 16, kFmtBitBlt, 3, 0,
+                 kFmtShift, -1, -1,
+                 IS_QUAD_OP | REG_DEF0_USE12,
+                 "sub", "!0C, !1C, !2C!3H", 4, kFixupNone),
+#endif
 };
 
 // new_lir replaces orig_lir in the pcrel_fixup list.

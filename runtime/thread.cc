@@ -71,6 +71,10 @@
 #include "vmap_table.h"
 #include "well_known_classes.h"
 
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+#include "hprof/hprof.h"
+#endif
+
 namespace art {
 
 bool Thread::is_started_ = false;
@@ -962,6 +966,7 @@ struct StackDumpVisitor : public StackVisitor {
 
 static bool ShouldShowNativeStack(const Thread* thread)
     SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+
   ThreadState state = thread->GetState();
 
   // In native code somewhere in the VM (one of the kWaitingFor* states)? That's interesting.
@@ -1779,6 +1784,30 @@ void Thread::ThrowNewWrappedException(const ThrowLocation& throw_location,
 void Thread::ThrowOutOfMemoryError(const char* msg) {
   LOG(ERROR) << StringPrintf("Throwing OutOfMemoryError \"%s\"%s",
       msg, (tls32_.throwing_OutOfMemoryError ? " (recursive case)" : ""));
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+  if (!tls32_.throwing_OutOfMemoryError) {
+    if (gOomeHprofPath) {
+      char buf[256];
+      snprintf(buf, sizeof(buf), "%s/%d.hprof", gOomeHprofPath, (int) getpid());
+      LOG(ERROR) << StringPrintf("Gen hprof %s when OOME", buf);
+
+      Thread* self = Thread::Current();
+      bool isSharedHeld = false;
+      if (Locks::mutator_lock_->IsSharedHeld(self)) {
+        isSharedHeld = true;
+        // self->TransitionFromRunnableToSuspended(kSuspended);
+        Locks::mutator_lock_->SharedUnlock(self);
+      }
+      hprof::DumpHeap(buf, -1, false);
+      if (isSharedHeld) {
+        // self->TransitionFromSuspendedToRunnable();
+        Locks::mutator_lock_->SharedLock(self);
+      }
+    } else {
+      LOG(ERROR) << "Not gen hprof when OOME";
+    }
+  }
+#endif
   ThrowLocation throw_location = GetCurrentLocationForThrow();
   if (!tls32_.throwing_OutOfMemoryError) {
     tls32_.throwing_OutOfMemoryError = true;
@@ -2107,6 +2136,11 @@ class ReferenceMapVisitor : public StackVisitor {
 
     // Process register map (which native and runtime methods don't have)
     if (!m->IsNative() && !m->IsRuntimeMethod() && !m->IsProxyMethod()) {
+#ifdef MTK_ART_COMMON
+        if (ScanLiveReferences(m, &visitor_)) {
+          return;
+        }
+#endif
       const uint8_t* native_gc_map = m->GetNativeGcMap(sizeof(void*));
       CHECK(native_gc_map != nullptr) << PrettyMethod(m);
       const DexFile::CodeItem* code_item = m->GetCodeItem();
@@ -2166,6 +2200,8 @@ class ReferenceMapVisitor : public StackVisitor {
   const RootVisitor& visitor_;
 };
 
+#ifndef MTK_ART_COMMON
+// Move below class declaration to "object_callbacks.h".
 class RootCallbackVisitor {
  public:
   RootCallbackVisitor(RootCallback* callback, void* arg, uint32_t tid)
@@ -2180,6 +2216,7 @@ class RootCallbackVisitor {
   void* const arg_;
   const uint32_t tid_;
 };
+#endif
 
 void Thread::SetClassLoaderOverride(mirror::ClassLoader* class_loader_override) {
   VerifyObject(class_loader_override);

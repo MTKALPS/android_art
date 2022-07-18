@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "jni_compiler.h"
+
 #include <algorithm>
 #include <memory>
 #include <vector>

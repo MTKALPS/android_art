@@ -318,6 +318,12 @@ class DexFileMethodInliner {
                               MIR* move_result, const InlineMethod& method, uint32_t method_idx);
     static bool GenInlineIPut(MIRGraph* mir_graph, BasicBlock* bb, MIR* invoke,
                               MIR* move_result, const InlineMethod& method, uint32_t method_idx);
+#ifdef MTK_ART_COMMON
+    static bool GenInlineCustomMethod(MIRGraph* mir_graph, BasicBlock* bb, MIR* invoke,
+                                      MIR* move_result, const InlineMethod& method, uint32_t method_idx);
+    static bool GenInlineBlindGut(MIRGraph* mir_graph, BasicBlock* bb, MIR* invoke,
+                                  MIR* move_result, const InlineMethod& method);
+#endif
 
     ReaderWriterMutex lock_;
     /*

@@ -2548,6 +2548,9 @@ JDWP::JdwpError Dbg::GetLocalValues(JDWP::Request* request, JDWP::ExpandBuf* pRe
 JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAccessUnchecked& soa,
                                    int slot, JDWP::JdwpTag tag, uint8_t* buf, size_t width) {
   mirror::ArtMethod* m = visitor.GetMethod();
+#ifdef MTK_ART_COMMON
+  uintptr_t nPc = visitor.GetNativePcOffset();
+#endif
   uint16_t reg = DemangleSlot(slot, m);
   // TODO: check that the tag is compatible with the actual type of the slot!
   // TODO: check slot is valid for this method or return INVALID_SLOT error.
@@ -2556,7 +2559,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_BOOLEAN: {
       CHECK_EQ(width, 1U);
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kIntVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kIntVReg, &intVal)) {
+#endif
         VLOG(jdwp) << "get boolean local " << reg << " = " << intVal;
         JDWP::Set1(buf + 1, intVal != 0);
       } else {
@@ -2568,7 +2575,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_BYTE: {
       CHECK_EQ(width, 1U);
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kIntVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kIntVReg, &intVal)) {
+#endif
         VLOG(jdwp) << "get byte local " << reg << " = " << intVal;
         JDWP::Set1(buf + 1, intVal);
       } else {
@@ -2581,7 +2592,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_CHAR: {
       CHECK_EQ(width, 2U);
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kIntVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kIntVReg, &intVal)) {
+#endif
         VLOG(jdwp) << "get short/char local " << reg << " = " << intVal;
         JDWP::Set2BE(buf + 1, intVal);
       } else {
@@ -2593,7 +2608,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_INT: {
       CHECK_EQ(width, 4U);
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kIntVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kIntVReg, &intVal)) {
+#endif
         VLOG(jdwp) << "get int local " << reg << " = " << intVal;
         JDWP::Set4BE(buf + 1, intVal);
       } else {
@@ -2605,7 +2624,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_FLOAT: {
       CHECK_EQ(width, 4U);
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kFloatVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kFloatVReg, &intVal)) {
+#endif
         VLOG(jdwp) << "get float local " << reg << " = " << intVal;
         JDWP::Set4BE(buf + 1, intVal);
       } else {
@@ -2623,7 +2646,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_THREAD_GROUP: {
       CHECK_EQ(width, sizeof(JDWP::ObjectId));
       uint32_t intVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVReg(m, reg, kReferenceVReg, &intVal, nPc)) {
+#else
       if (visitor.GetVReg(m, reg, kReferenceVReg, &intVal)) {
+#endif
         mirror::Object* o = reinterpret_cast<mirror::Object*>(intVal);
         VLOG(jdwp) << "get " << tag << " object local " << reg << " = " << o;
         if (!Runtime::Current()->GetHeap()->IsValidObjectAddress(o)) {
@@ -2640,7 +2667,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_DOUBLE: {
       CHECK_EQ(width, 8U);
       uint64_t longVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVRegPair(m, reg, kDoubleLoVReg, kDoubleHiVReg, &longVal, nPc)) {
+#else
       if (visitor.GetVRegPair(m, reg, kDoubleLoVReg, kDoubleHiVReg, &longVal)) {
+#endif
         VLOG(jdwp) << "get double local " << reg << " = " << longVal;
         JDWP::Set8BE(buf + 1, longVal);
       } else {
@@ -2652,7 +2683,11 @@ JDWP::JdwpError Dbg::GetLocalValue(const StackVisitor& visitor, ScopedObjectAcce
     case JDWP::JT_LONG: {
       CHECK_EQ(width, 8U);
       uint64_t longVal;
+#ifdef MTK_ART_COMMON
+      if (visitor.GetVRegPair(m, reg, kLongLoVReg, kLongHiVReg, &longVal, nPc)) {
+#else
       if (visitor.GetVRegPair(m, reg, kLongLoVReg, kLongHiVReg, &longVal)) {
+#endif
         VLOG(jdwp) << "get long local " << reg << " = " << longVal;
         JDWP::Set8BE(buf + 1, longVal);
       } else {
@@ -3959,6 +3994,7 @@ void Dbg::DdmBroadcast(bool connect) {
 }
 
 void Dbg::DdmConnected() {
+  usleep(200 * 1000);
   Dbg::DdmBroadcast(true);
 }
 

@@ -85,6 +85,34 @@ enum BBType {
 };
 
 // Shared pseudo opcodes - must be < 0.
+#if defined(MTK_ART_COMMON)
+// It seems stupid, but write the MACRO within enum scope will be failed in
+// tools/generate-operator-out.py process
+enum LIRPseudoOpcode {
+  kPseudoLoopPreHeader = -22,  // MTK OPT Extension
+  kPseudoLoopPreBody = -21,    // MTK OPT Extension
+  kPseudoLoopStart = -20,      // MTK OPT Extension
+  kPseudoLoopBodyEnd = -19,    // MTK OPT Extension
+  kPseudoLoopHeader = -18,     // MTK OPT Extension
+  kPseudoLoopEnd = -17,        // MTK OPT Extension
+  kPseudoExportedPC = -16,
+  kPseudoSafepointPC = -15,
+  kPseudoIntrinsicRetry = -14,
+  kPseudoSuspendTarget = -13,
+  kPseudoThrowTarget = -12,
+  kPseudoCaseLabel = -11,
+  kPseudoMethodEntry = -10,
+  kPseudoMethodExit = -9,
+  kPseudoBarrier = -8,
+  kPseudoEntryBlock = -7,
+  kPseudoExitBlock = -6,
+  kPseudoTargetLabel = -5,
+  kPseudoDalvikByteCodeBoundary = -4,
+  kPseudoPseudoAlign4 = -3,
+  kPseudoEHBlockLabel = -2,
+  kPseudoNormalBlockLabel = -1,
+};
+#else
 enum LIRPseudoOpcode {
   kPseudoExportedPC = -16,
   kPseudoSafepointPC = -15,
@@ -103,7 +131,166 @@ enum LIRPseudoOpcode {
   kPseudoEHBlockLabel = -2,
   kPseudoNormalBlockLabel = -1,
 };
+#endif
 
+#if defined(MTK_ART_COMMON) /* Add MIR extension */
+// It seems stupid, but write the MACRO within enum scope will be failed in
+// tools/generate-operator-out.py process
+enum ExtendedMIROpcode {
+  kMirOpFirst = kNumPackedOpcodes,
+  kMirOpPhi = kMirOpFirst,
+  kMirOpCopy,
+  kMirOpFusedCmplFloat,
+  kMirOpFusedCmpgFloat,
+  kMirOpFusedCmplDouble,
+  kMirOpFusedCmpgDouble,
+  kMirOpFusedCmpLong,
+  kMirOpNop,
+  kMirOpNullCheck,
+  kMirOpRangeCheck,
+  kMirOpDivZeroCheck,
+  kMirOpCheck,
+  kMirOpCheckPart2,
+  kMirOpSelect,
+
+  // Vector opcodes:
+  // TypeSize is an encoded field giving the element type and the vector size.
+  // It is encoded as OpSize << 16 | (number of bits in vector)
+  //
+  // Destination and source are integers that will be interpreted by the
+  // backend that supports Vector operations.  Backends are permitted to support only
+  // certain vector register sizes.
+  //
+  // At this point, only two operand instructions are supported.  Three operand instructions
+  // could be supported by using a bit in TypeSize and arg[0] where needed.
+
+  // @brief MIR to move constant data to a vector register
+  // vA: destination
+  // vB: number of bits in register
+  // args[0]~args[3]: up to 128 bits of data for initialization
+  kMirOpConstVector,
+
+  // @brief MIR to move a vectorized register to another
+  // vA: destination
+  // vB: source
+  // vC: TypeSize
+  kMirOpMoveVector,
+
+  // @brief Packed multiply of units in two vector registers: vB = vB .* vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedMultiply,
+
+  // @brief Packed addition of units in two vector registers: vB = vB .+ vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedAddition,
+
+  // @brief Packed subtraction of units in two vector registers: vB = vB .- vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedSubtract,
+
+  // @brief Packed shift left of units in two vector registers: vB = vB .<< vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: amount to shift
+  // vC: TypeSize
+  kMirOpPackedShiftLeft,
+
+  // @brief Packed signed shift right of units in two vector registers: vB = vB .>> vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: amount to shift
+  // vC: TypeSize
+  kMirOpPackedSignedShiftRight,
+
+  // @brief Packed unsigned shift right of units in two vector registers: vB = vB .>>> vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: amount to shift
+  // vC: TypeSize
+  kMirOpPackedUnsignedShiftRight,
+
+  // @brief Packed bitwise and of units in two vector registers: vB = vB .& vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedAnd,
+
+  // @brief Packed bitwise or of units in two vector registers: vB = vB .| vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedOr,
+
+  // @brief Packed bitwise xor of units in two vector registers: vB = vB .^ vC using vA to know the type of the vector.
+  // vA: destination and source
+  // vB: source
+  // vC: TypeSize
+  kMirOpPackedXor,
+
+  // @brief Reduce a 128-bit packed element into a single VR by taking lower bits
+  // @details Instruction does a horizontal addition of the packed elements and then adds it to VR
+  // vA: destination and source VR (not vector register)
+  // vB: source (vector register)
+  // vC: TypeSize
+  kMirOpPackedAddReduce,
+
+  // @brief Extract a packed element into a single VR.
+  // vA: destination VR (not vector register)
+  // vB: source (vector register)
+  // vC: TypeSize
+  // arg[0]: The index to use for extraction from vector register (which packed element)
+  kMirOpPackedReduce,
+
+  // @brief Create a vector value, with all TypeSize values equal to vC
+  // vA: destination vector register
+  // vB: source VR (not vector register)
+  // vC: TypeSize
+  kMirOpPackedSet,
+
+  // @brief Reserve N vector registers (named 0..N-1)
+  // vA: Number of registers
+  // @note: The backend may choose to map vector numbers used in vector opcodes.
+  //  Reserved registers are removed from the list of backend temporary pool.
+  kMirOpReserveVectorRegisters,
+
+  // @brief Free Reserved vector registers
+  // @note: All currently reserved vector registers are returned to the temporary pool.
+  kMirOpReturnVectorRegisters,
+
+  kMtkExtMIROp1,    // MTK OPT Extension
+  kMtkExtMIROp2,    // MTK OPT Extension
+  kMtkExtMIROp3,    // MTK OPT Extension
+  kMtkExtMIROp4,    // MTK OPT Extension
+  kMtkExtMIROp5,    // MTK OPT Extension
+  kMtkExtMIROp6,    // MTK OPT Extension
+  kMtkExtMIROp7,    // MTK OPT Extension
+  kMtkExtMIROp8,    // MTK OPT Extension
+  kMtkExtMIROp9,    // MTK OPT Extension
+  kMtkExtMIROp10,   // MTK OPT Extension
+  kMtkExtMIROp11,   // MTK OPT Extension
+  kMtkExtMIROp12,   // MTK OPT Extension
+  kMtkExtMIROp13,   // MTK OPT Extension
+  kMtkExtMIROp14,   // MTK OPT Extension
+  kMtkExtMIROp15,   // MTK OPT Extension
+  kMtkExtMIROp16,   // MTK OPT Extension
+  kMtkExtMIROp17,   // MTK OPT Extension
+  kMtkExtMIROp18,   // MTK OPT Extension
+  kMtkExtMIROp19,   // MTK OPT Extension
+  kMtkExtMIROp20,   // MTK OPT Extension
+  kMtkExtMIROp21,   // MTK OPT Extension
+  kMtkExtMIROp22,   // MTK OPT Extension
+  kMtkExtMIROp23,   // MTK OPT Extension
+  kMtkExtMIROp24,   // MTK OPT Extension
+  kMtkExtMIROp25,   // MTK OPT Extension
+  kMtkExtMIROp26,   // MTK OPT Extension
+  kMtkExtMIROp27,   // MTK OPT Extension
+
+  kMirOpLast,
+};
+#else
 enum ExtendedMIROpcode {
   kMirOpFirst = kNumPackedOpcodes,
   kMirOpPhi = kMirOpFirst,
@@ -230,6 +417,7 @@ enum ExtendedMIROpcode {
 
   kMirOpLast,
 };
+#endif
 
 enum MIROptimizationFlagPositions {
   kMIRIgnoreNullCheck = 0,
@@ -457,6 +645,66 @@ enum MemBarrierKind {
 
 std::ostream& operator<<(std::ostream& os, const MemBarrierKind& kind);
 
+#ifdef MTK_ART_COMMON
+// It seems stupid, but write the MACRO within enum scope will be failed in
+// tools/generate-operator-out.py process
+enum OpFeatureFlags {
+  kIsBranch = 0,
+  kNoOperand,
+  kIsUnaryOp,
+  kIsBinaryOp,
+  kIsTertiaryOp,
+  kIsQuadOp,
+  kIsQuinOp,
+  kIsSextupleOp,
+  kIsIT,
+  kIsMoveOp,
+  kMemLoad,
+  kMemStore,
+  kMemVolatile,
+  kMemScaledx0,
+  kMemScaledx2,
+  kMemScaledx4,
+  kPCRelFixup,  // x86 FIXME: add NEEDS_FIXUP to instruction attributes.
+  kRegDef0,
+  kRegDef1,
+  kRegDef2,
+  kRegDefA,
+  kRegDefD,
+  kRegDefFPCSList0,
+  kRegDefFPCSList2,
+  kRegDefList0,
+  kRegDefList1,
+  kRegDefList2,
+  kRegDefLR,
+  kRegDefSP,
+  kRegUse0,
+  kRegUse1,
+  kRegUse2,
+  kRegUse3,
+  kRegUse4,
+  kRegUseA,
+  kRegUseC,
+  kRegUseD,
+  kRegUseB,
+  kRegUseFPCSList0,
+  kRegUseFPCSList2,
+  kRegUseList0,
+  kRegUseList1,
+  kRegUseLR,
+  kRegUsePC,
+  kRegUseSP,
+  kSetsCCodes,
+  kUsesCCodes,
+  kUseFpStack,
+  kSetsFCCodes,
+  kUsesFCCodes,
+  kUseHi,
+  kUseLo,
+  kDefHi,
+  kDefLo
+};
+#else
 enum OpFeatureFlags {
   kIsBranch = 0,
   kNoOperand,
@@ -511,6 +759,7 @@ enum OpFeatureFlags {
   kDefHi,
   kDefLo
 };
+#endif
 
 enum SelectInstructionKind {
   kSelectNone,

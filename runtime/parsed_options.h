@@ -27,6 +27,28 @@
 #include "instruction_set.h"
 #include "profiler_options.h"
 
+#ifdef MTK_DEBUG_VLOG
+#define MTK_DEBUG_VLOG_CLASS            0x0001
+#define MTK_DEBUG_VLOG_COMPILER         0x0002
+#define MTK_DEBUG_VLOG_GC               0x0004
+#define MTK_DEBUG_VLOG_HEAP             0x0008
+#define MTK_DEBUG_VLOG_JDWP             0x0010
+#define MTK_DEBUG_VLOG_JNI              0x0020
+#define MTK_DEBUG_VLOG_MONITOR          0x0040
+#define MTK_DEBUG_VLOG_PROFILER         0x0080
+#define MTK_DEBUG_VLOG_SIGNALS          0x0100
+#define MTK_DEBUG_VLOG_STARTUP          0x0200
+#define MTK_DEBUG_VLOG_THIRD_PARTY_JNI  0x0400
+#define MTK_DEBUG_VLOG_THREADS          0x0800
+#define MTK_DEBUG_VLOG_VERIFIER         0x1000
+
+#define MTK_DEBUG_VLOG_ALL_FLAG         (MTK_DEBUG_VLOG_CLASS | MTK_DEBUG_VLOG_COMPILER | MTK_DEBUG_VLOG_GC | \
+                                         MTK_DEBUG_VLOG_HEAP | MTK_DEBUG_VLOG_JDWP | MTK_DEBUG_VLOG_JNI | \
+                                         MTK_DEBUG_VLOG_MONITOR | MTK_DEBUG_VLOG_PROFILER | MTK_DEBUG_VLOG_SIGNALS | \
+                                         MTK_DEBUG_VLOG_STARTUP | MTK_DEBUG_VLOG_THIRD_PARTY_JNI | MTK_DEBUG_VLOG_THREADS | \
+                                         MTK_DEBUG_VLOG_VERIFIER)
+#endif
+
 namespace art {
 
 class CompilerCallbacks;
@@ -123,6 +145,9 @@ class ParsedOptions {
   bool ParseUnsignedInteger(const std::string& option, char after_char, unsigned int* parsed_value);
   bool ParseDouble(const std::string& option, char after_char, double min, double max,
                    double* parsed_value);
+  #ifdef MTK_ART_COMMON
+  size_t ParseIntegerOrDie(const std::string& s);
+  #endif
 };
 
 }  // namespace art

@@ -30,6 +30,14 @@ class DexFile;
 
 // Enable/disable tracking values stored in the FILLED_NEW_ARRAY result.
 static constexpr bool kLocalValueNumberingEnableFilledNewArrayTracking = true;
+#ifdef MTK_ART_COMMON
+struct subExpression {
+  MIR *mir;
+  int vReg;     // left value represent as Davlik reg
+  int sReg[2];  // left value represent as SSA reg (Lo, Hi)
+  bool isDestWide;
+};
+#endif
 
 class LocalValueNumbering {
  private:
@@ -75,6 +83,24 @@ class LocalValueNumbering {
   void Merge(MergeType merge_type);  // Merge gvn_->merge_lvns_.
 
   uint16_t GetValueNumber(MIR* mir);
+#ifdef MTK_ART_COMMON
+  void resetAllSubExpList(unsigned num_ins);
+  void resetAllvRegDefLocTbl(unsigned num_ins);
+  bool IsEscapeInsn(MIR *mir);
+  bool isConstOp(MIR *mir);
+  bool isMoveOp(MIR *mir);
+  subExpression* getSubExp(MIR *mir);
+  void setSubExp(subExpression *subExp, MIR *mir);
+  void setDefineLocation(MIR *mir);
+  bool isNewSubExp(MIR *mir);
+  bool localComSubExpElimination(BasicBlock *bb);
+  MIR* getLongestSubExp(MIR *firstMIR);
+  MIR* replaceSubExp(BasicBlock *bb, MIR *firstMIR, MIR* lastMIR);
+  void encodeSSARep(MIR *mir, SSARepresentation *ssa_rep, subExpression *subExp);
+  bool hasRedefined(subExpression *subExp);
+  bool isInsideUse(MIR *firstMIR, MIR *lastMIR, int ssaReg);
+  static unsigned stop_count;
+#endif
 
   // LocalValueNumbering should be allocated on the ArenaStack (or the native stack).
   static void* operator new(size_t size, ScopedArenaAllocator* allocator) {
@@ -389,6 +415,11 @@ class LocalValueNumbering {
   ScopedArenaSafeMap<ScopedArenaVector<BasicBlockId>, uint16_t> merge_map_;
   // New memory version for merge, kNoValue if all memory versions matched.
   uint16_t merge_new_memory_version_;
+#ifdef MTK_ART_COMMON
+  subExpression *subExpList;
+  MIR **vRegDefLocTbl;
+#endif
+
 
   DISALLOW_COPY_AND_ASSIGN(LocalValueNumbering);
 };

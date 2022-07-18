@@ -21,6 +21,10 @@
 #include <iosfwd>
 #include <string>
 #include <vector>
+#ifdef MTK_DEBUG_REF_TABLE
+#include <list>
+#include "stack.h"
+#endif
 
 #include "base/allocator.h"
 #include "base/mutex.h"
@@ -31,6 +35,16 @@ namespace art {
 namespace mirror {
 class Object;
 }  // namespace mirror
+
+#ifdef MTK_DEBUG_REF_TABLE
+class BackTraceVisitor : public StackVisitor {
+  public:
+    explicit BackTraceVisitor(Thread* thread) : StackVisitor(thread, NULL) {}
+    bool VisitFrame() SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+      return true;
+    }
+};
+#endif
 
 // Maintain a table of references.  Used for JNI monitor references and
 // JNI pinned array references.
@@ -56,11 +70,21 @@ class ReferenceTable {
                       TrackingAllocator<GcRoot<mirror::Object>, kAllocatorTagReferenceTable>> Table;
   static void Dump(std::ostream& os, Table& entries)
       SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+#ifdef MTK_DEBUG_REF_TABLE
+  typedef std::vector<BacktraceList> debugTable;
+  static void Dump(std::ostream& os, Table& entries, debugTable& debug_entries)
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+  static void printStacktrace(std::ostream& os, BacktraceList backtrace)
+      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+#endif
   friend class IndirectReferenceTable;  // For Dump.
 
   std::string name_;
   Table entries_;
   size_t max_size_;
+#ifdef MTK_DEBUG_REF_TABLE
+  debugTable debug_entries_;
+#endif
 };
 
 }  // namespace art

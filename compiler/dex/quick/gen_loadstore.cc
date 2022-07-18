@@ -40,6 +40,9 @@ LIR* Mir2Lir::LoadConstant(RegStorage r_dest, int value) {
  * promoted floating point register, also copy a zero into the int/ref identity of
  * that sreg.
  */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::Workaround7250540(RegLocation rl_dest, RegStorage zero_reg) {
   if (rl_dest.fp) {
     int pmap_index = SRegToPMap(rl_dest.s_reg_low);

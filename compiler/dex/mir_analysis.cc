@@ -841,6 +841,137 @@ const uint32_t MIRGraph::analysis_attributes_[kMirOpLast] = {
 
   // 113 MIR_SELECT
   AN_NONE,
+
+  // 114 MirOpConstVector
+  AN_NONE,
+
+  // 115 MirOpMoveVector
+  AN_NONE,
+
+  // 116 MirOpPackedMultiply
+  AN_NONE,
+
+  // 117 MirOpPackedAddition
+  AN_NONE,
+
+  // 118 MirOpPackedSubtract
+  AN_NONE,
+
+  // 119 MirOpPackedShiftLeft
+  AN_NONE,
+
+  // 120 MirOpPackedSignedShiftRight
+  AN_NONE,
+
+  // 121 MirOpPackedUnsignedShiftRight
+  AN_NONE,
+
+  // 122 MirOpPackedAnd
+  AN_NONE,
+
+  // 123 MirOpPackedOr
+  AN_NONE,
+
+  // 124 MirOpPackedXor
+  AN_NONE,
+
+  // 125 MirOpPackedAddReduce
+  AN_NONE,
+
+  // 126 MirOpPackedReduce
+  AN_NONE,
+
+  // 127 MirOpPackedSet
+  AN_NONE,
+
+  // 128 MirOpReserveVectorRegisters
+  AN_NONE,
+
+  // 129 MirOpReturnVectorRegisters
+  AN_NONE,
+
+#ifdef MTK_ART_COMMON /* Add MIR extension */
+  // 130 MtkExtMIROp1
+  AN_NONE,
+
+  // 131 MtkExtMIROp2
+  AN_NONE,
+
+  // 132 MtkExtMIROp3
+  AN_NONE,
+
+  // 133 MtkExtMIROp4
+  AN_NONE,
+
+  // 134 MtkExtMIROp5
+  AN_NONE,
+
+  // 135 MtkExtMIROp6
+  AN_NONE,
+
+  // 136 MtkExtMIROp7
+  AN_MATH | AN_FP | AN_SINGLE,
+
+  // 137 MtkExtMIROp8
+  AN_MATH | AN_FP | AN_DOUBLE,
+
+  // 138 MtkExtMIROp9
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 139 MtkExtMIROp10
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 140 MtkExtMIROp11
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 141 MtkExtMIROp12
+  AN_NONE,
+
+  // 142 MtkExtMIROp13
+  AN_NONE,
+
+  // 143 MtkExtMIROp14
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 144 MtkExtMIROp15
+  AN_MATH | AN_BRANCH | AN_LONG,
+
+  // 145 MtkExtMIROp16
+  AN_MATH | AN_LONG,
+
+  // 146 MtkExtMIROp17
+  AN_BRANCH,
+
+  // 147 MtkExtMIROp18
+  AN_NONE,
+
+  // 148 MtkExtMIROp19
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 149 MtkExtMIROp20
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 150 MtkExtMIROp21
+  AN_MATH | AN_BRANCH | AN_INT,
+
+  // 151 MtkExtMIROp22
+  AN_ARRAYOP,
+
+  // 152 MtkExtMIROp23
+  AN_ARRAYOP,
+
+  // 153 MtkExtMIROp24
+  AN_ARRAYOP,
+
+  // 154 MtkExtMIROp25
+  AN_ARRAYOP,
+
+  // 155 MtkExtMIROp26
+  AN_NONE,
+
+  // 156 MtkExtMIROp27
+  AN_NONE,
+#endif
 };
 
 struct MethodStats {

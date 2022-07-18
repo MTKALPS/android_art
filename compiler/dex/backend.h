@@ -17,10 +17,15 @@
 #ifndef ART_COMPILER_DEX_BACKEND_H_
 #define ART_COMPILER_DEX_BACKEND_H_
 
+#include "target_info.h"
+
 namespace art {
 
 class ArenaAllocator;
 class CompiledMethod;
+#ifdef MTK_ART_COMMON
+struct MIR;
+#endif
 
 class Backend {
   public:
@@ -38,7 +43,7 @@ class Backend {
 
     /*
      * Return the number of reservable vector registers supported
-     * @param fp_used  ‘true’ if floating point computations will be
+     * @param fp_used  ?�true??if floating point computations will be
      * executed while vector registers are reserved.
      * @return the number of vector registers that are available
      * @note The backend should ensure that sufficient vector registers
@@ -46,9 +51,26 @@ class Backend {
      * registers, if scalar code also uses the vector registers.
      */
     virtual int NumReservableVectorRegisters(bool fp_used) { return 0; }
+    #ifdef MTK_ART_COMMON
+    void SetTargetInfo(TargetInfo* target_info) {
+      target_info_ = target_info;
+    }
+
+    const TargetInfo* GetTargetInfo() {
+      return target_info_;
+    }
+    #endif
 
   protected:
+    #ifdef MTK_ART_COMMON
+    explicit Backend(ArenaAllocator* arena)
+      :  target_info_(nullptr), cur_mir_(nullptr), arena_(arena) {}
+
+    const TargetInfo* target_info_;
+    MIR* cur_mir_;
+    #else
     explicit Backend(ArenaAllocator* arena) : arena_(arena) {}
+    #endif
     ArenaAllocator* const arena_;
 };  // Class Backend
 

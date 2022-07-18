@@ -67,4 +67,9 @@ void BBOptimizations::Start(PassDataHolder* data) const {
   c_unit->mir_graph->BasicBlockOptimization();
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak)) void BBOptimizations::End(PassDataHolder* data) const {
+}
+#endif
+
 }  // namespace art

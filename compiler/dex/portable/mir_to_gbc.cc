@@ -1636,6 +1636,14 @@ void MirConverter::ConvertExtendedMIR(BasicBlock* bb, MIR* mir,
     case kMirOpFusedCmpLong:
       UNIMPLEMENTED(FATAL) << "kMirOpLongCmpBranch unsupported";
       break;
+    #ifdef MTK_ART_COMMON
+    case kMtkExtMIROp15:
+      UNIMPLEMENTED(FATAL) << "kMtkExtMIROp15 unsupported";
+      break;
+    case kMtkExtMIROp16:
+      UNIMPLEMENTED(FATAL) << "kMtkExtMIROp16 unsupported";
+      break;
+    #endif
     default:
       break;
   }

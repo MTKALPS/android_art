@@ -3166,21 +3166,30 @@ void Heap::RunFinalization(JNIEnv* env) {
         CacheMethod(env, WellKnownClasses::java_lang_System, true, "runFinalization", "()V");
     CHECK(WellKnownClasses::java_lang_System_runFinalization != nullptr);
   }
+  LOG(INFO)<<"[heap] RunFinalization start";
   env->CallStaticVoidMethod(WellKnownClasses::java_lang_System,
                             WellKnownClasses::java_lang_System_runFinalization);
   env->CallStaticVoidMethod(WellKnownClasses::java_lang_System,
                             WellKnownClasses::java_lang_System_runFinalization);
+  LOG(INFO)<<"[heap] RunFinalization end";
 }
 
 void Heap::RegisterNativeAllocation(JNIEnv* env, size_t bytes) {
   Thread* self = ThreadForEnv(env);
+  LOG(INFO)<<"[heap] RegisterNativeAllocation start bytes:"<<bytes;
   if (native_need_to_run_finalization_) {
+	LOG(INFO)<<"[heap] RegisterNativeAllocation RunFinalization time 1";
     RunFinalization(env);
     UpdateMaxNativeFootprint();
     native_need_to_run_finalization_ = false;
   }
   // Total number of native bytes allocated.
+  LOG(INFO)<<"[heap] RegisterNativeAllocation native_bytes_allocated_:"<<native_bytes_allocated_.LoadRelaxed();
   size_t new_native_bytes_allocated = native_bytes_allocated_.FetchAndAddSequentiallyConsistent(bytes);
+  LOG(INFO)<<"[heap] RegisterNativeAllocation new_native_bytes_allocated:"<<new_native_bytes_allocated
+	        <<", native_bytes_allocated_:"<<native_bytes_allocated_.LoadRelaxed()
+	        <<", native_footprint_gc_watermark_:"<<native_footprint_gc_watermark_
+	        <<", growth_limit_:"<<growth_limit_;
   new_native_bytes_allocated += bytes;
   if (new_native_bytes_allocated > native_footprint_gc_watermark_) {
     collector::GcType gc_type = have_zygote_space_ ? collector::kGcTypePartial :
@@ -3191,11 +3200,13 @@ void Heap::RegisterNativeAllocation(JNIEnv* env, size_t bytes) {
     if (new_native_bytes_allocated > growth_limit_) {
       if (WaitForGcToComplete(kGcCauseForNativeAlloc, self) != collector::kGcTypeNone) {
         // Just finished a GC, attempt to run finalizers.
+		LOG(INFO)<<"[heap] RegisterNativeAllocation RunFinalization time 2";
         RunFinalization(env);
         CHECK(!env->ExceptionCheck());
       }
       // If we still are over the watermark, attempt a GC for alloc and run finalizers.
       if (new_native_bytes_allocated > growth_limit_) {
+		LOG(INFO)<<"[heap] RegisterNativeAllocation RunFinalization time 3";
         CollectGarbageInternal(gc_type, kGcCauseForNativeAlloc, false);
         RunFinalization(env);
         native_need_to_run_finalization_ = false;
@@ -3211,6 +3222,7 @@ void Heap::RegisterNativeAllocation(JNIEnv* env, size_t bytes) {
         CollectGarbageInternal(gc_type, kGcCauseForNativeAlloc, false);
       }
     }
+	LOG(INFO)<<"[heap] RegisterNativeAllocation end";
   }
 }
 

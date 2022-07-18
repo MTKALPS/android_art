@@ -134,6 +134,16 @@ class ResourceMask {
     return *this;
   }
 
+  #ifdef MTK_ART_COMMON
+  uint64_t GetMaskLow() const {
+    return masks_[0];
+  }
+
+  uint64_t GetMaskHigh() const {
+    return masks_[1];
+  }
+  #endif
+
  private:
   uint64_t masks_[2];
 

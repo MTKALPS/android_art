@@ -90,6 +90,10 @@
 #include "cutils/properties.h"
 #endif
 
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+#include <dirent.h>
+#endif
+
 namespace art {
 
 static constexpr bool kEnableJavaStackTraceHandler = false;
@@ -209,6 +213,12 @@ Runtime::~Runtime() {
   delete null_pointer_handler_;
   delete suspend_handler_;
   delete stack_overflow_handler_;
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+  if (gOomeHprofPath) {
+    free(gOomeHprofPath);
+    gOomeHprofPath = NULL;
+  }
+#endif
 }
 
 struct AbortState {
@@ -678,6 +688,22 @@ bool Runtime::Init(const RuntimeOptions& raw_options, bool ignore_unrecognized) 
   }
   VLOG(startup) << "Runtime::Init -verbose:startup enabled";
 
+#ifdef HAVE_ANDROID_OS
+char propStr[PROPERTY_VALUE_MAX];
+#endif
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+  if (property_get("dalvik.vm.oome-hprof-path", propStr, "/data/anr")) {
+    gOomeHprofPath = strdup(propStr);
+  }
+#endif
+
+#if defined (HAVE_ANDROID_OS) && defined(MTK_EXPLICIT_GC_DEBUG)
+  property_get("dalvik.vm.debug.explicitgc", propStr, "");
+  if ((*propStr != 0) && (!strcmp(propStr, "true")))  {
+      gLogExplicitGC = true;
+  } 
+#endif
+
   QuasiAtomic::Startup();
 
   Monitor::Init(options->lock_profiling_threshold_, options->hook_is_sensitive_thread_);
@@ -1090,6 +1116,9 @@ void Runtime::BlockSignals() {
   signals.Add(SIGQUIT);
   // SIGUSR1 is used to initiate a GC.
   signals.Add(SIGUSR1);
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMMY_PREDUMP)
+  signals.Add(SIGSTKFLT);
+#endif
   signals.Block();
 }
 

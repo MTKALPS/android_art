@@ -319,6 +319,9 @@ bool Mir2Lir::GenSpecialIdentity(MIR* mir, const InlineMethod& special) {
 bool Mir2Lir::GenSpecialCase(BasicBlock* bb, MIR* mir, const InlineMethod& special) {
   DCHECK(special.flags & kInlineSpecial);
   current_dalvik_offset_ = mir->offset;
+  #ifdef MTK_ART_COMMON
+  MTKMarkCurrentOffset(mir);
+  #endif
   MIR* return_mir = nullptr;
   bool successful = false;
 
@@ -361,6 +364,9 @@ bool Mir2Lir::GenSpecialCase(BasicBlock* bb, MIR* mir, const InlineMethod& speci
     // Handle verbosity for return MIR.
     if (return_mir != nullptr) {
       current_dalvik_offset_ = return_mir->offset;
+      #ifdef MTK_ART_COMMON
+      MTKMarkCurrentOffset(return_mir);
+      #endif
       // Not handling special identity case because it already generated code as part
       // of the return. The label should have been added before any code was generated.
       if (special.opcode != kInlineOpReturnArg) {
@@ -386,6 +392,9 @@ bool Mir2Lir::GenSpecialCase(BasicBlock* bb, MIR* mir, const InlineMethod& speci
  * load/store utilities here, or target-dependent genXX() handlers
  * when necessary.
  */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::CompileDalvikInstruction(MIR* mir, BasicBlock* bb, LIR* label_list) {
   RegLocation rl_src[3];
   RegLocation rl_dest = mir_graph_->GetBadLoc();
@@ -1097,6 +1106,11 @@ void Mir2Lir::HandleExtendedMethodMIR(BasicBlock* bb, MIR* mir) {
       // Ignore these known opcodes
       break;
     default:
+      #ifdef MTK_ART_COMMON
+      if (MtkHandleExtendedMethodMIR(bb, mir)) {
+        return;
+      }
+      #endif
       // Give the backends a chance to handle unknown extended MIR opcodes.
       GenMachineSpecificExtendedMethodMIR(bb, mir);
       break;
@@ -1115,6 +1129,9 @@ void Mir2Lir::GenPrintLabel(MIR* mir) {
 bool Mir2Lir::MethodBlockCodeGen(BasicBlock* bb) {
   if (bb->block_type == kDead) return false;
   current_dalvik_offset_ = bb->start_offset;
+  #ifdef MTK_ART_COMMON
+  MTKMarkCurrentOffset(bb->start_offset);
+  #endif
   MIR* mir;
   int block_id = bb->id;
 
@@ -1145,6 +1162,10 @@ bool Mir2Lir::MethodBlockCodeGen(BasicBlock* bb) {
     GenExitSequence();
   }
 
+  #ifdef MTK_ART_DBG
+  LOG(INFO) << "BB Id: " << bb->id;
+  #endif
+
   for (mir = bb->first_mir_insn; mir != NULL; mir = mir->next) {
     ResetRegPool();
     if (cu_->disable_opt & (1 << kTrackLiveTemps)) {
@@ -1163,6 +1184,9 @@ bool Mir2Lir::MethodBlockCodeGen(BasicBlock* bb) {
     }
 
     current_dalvik_offset_ = mir->offset;
+    #ifdef MTK_ART_COMMON
+    MTKMarkCurrentOffset(mir);
+    #endif
     int opcode = mir->dalvikInsn.opcode;
 
     GenPrintLabel(mir);
@@ -1187,6 +1211,10 @@ bool Mir2Lir::MethodBlockCodeGen(BasicBlock* bb) {
       work_half->dalvikInsn.opcode = static_cast<Instruction::Code>(kMirOpCheckPart2);
       work_half->meta.throw_insn = mir;
     }
+
+    #ifdef MTK_ART_DBG
+    LOG(INFO) << mir_graph_->GetDalvikDisassembly(mir);
+    #endif
 
     if (MIR::DecodedInstruction::IsPseudoMirOp(opcode)) {
       HandleExtendedMethodMIR(bb, mir);
@@ -1233,6 +1261,9 @@ bool Mir2Lir::SpecialMIR2LIR(const InlineMethod& special) {
   return GenSpecialCase(bb, mir, special);
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void Mir2Lir::MethodMIR2LIR() {
   cu_->NewTimingSplit("MIR2LIR");
 

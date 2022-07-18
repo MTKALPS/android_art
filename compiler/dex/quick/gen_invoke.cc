@@ -1709,6 +1709,9 @@ void Mir2Lir::GenInvoke(CallInfo* info) {
   DCHECK(cu_->compiler_driver->GetMethodInlinerMap() != nullptr);
   if (cu_->compiler_driver->GetMethodInlinerMap()->GetMethodInliner(cu_->dex_file)
       ->GenIntrinsic(this, info)) {
+#ifdef MTK_ART_COMMON
+    mir_graph_->SetInvokeInline();  // Related to Ldr/Str dual combination opt
+#endif
     return;
   }
   GenInvokeNoInline(info);

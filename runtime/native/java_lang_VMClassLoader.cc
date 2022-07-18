@@ -21,6 +21,8 @@
 #include "scoped_fast_native_object_access.h"
 #include "ScopedUtfChars.h"
 #include "zip_archive.h"
+#define ATRACE_TAG ATRACE_TAG_DALVIK
+#include <cutils/trace.h>
 
 namespace art {
 
@@ -34,8 +36,10 @@ static jclass VMClassLoader_findLoadedClass(JNIEnv* env, jclass, jobject javaLoa
   ClassLinker* cl = Runtime::Current()->GetClassLinker();
   std::string descriptor(DotToDescriptor(name.c_str()));
   const size_t descriptor_hash = ComputeModifiedUtf8Hash(descriptor.c_str());
+  ATRACE_BEGIN(StringPrintf("Find loaded class : %s", name.c_str()).c_str());
   mirror::Class* c = cl->LookupClass(descriptor.c_str(), descriptor_hash, loader);
   if (c != nullptr && c->IsResolved()) {
+    ATRACE_END();
     return soa.AddLocalReference<jclass>(c);
   }
   if (loader != nullptr) {
@@ -44,9 +48,11 @@ static jclass VMClassLoader_findLoadedClass(JNIEnv* env, jclass, jobject javaLoa
     c = cl->FindClassInPathClassLoader(soa, soa.Self(), descriptor.c_str(), descriptor_hash,
                                        hs.NewHandle(loader));
     if (c != nullptr) {
+      ATRACE_END();
       return soa.AddLocalReference<jclass>(c);
     }
   }
+  ATRACE_END();
   // Class wasn't resolved so it may be erroneous or not yet ready, force the caller to go into
   // the regular loadClass code.
   return nullptr;

@@ -72,6 +72,7 @@ void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context,
   } else {
     // The method is at the top of the stack.
     *out_method = (reinterpret_cast<StackReference<mirror::ArtMethod>* >(*out_sp)[0]).AsMirrorPtr();
+    // *out_method = reinterpret_cast<mirror::ArtMethod*>(reinterpret_cast<uintptr_t*>(*out_sp)[0]);
   }
 
   // Work out the return PC.  This will be the address of the instruction

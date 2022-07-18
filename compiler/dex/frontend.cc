@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+#include "frontend.h"
+
 #include <cstdint>
 
+#include "backend.h"
 #include "compiler.h"
 #include "compiler_internals.h"
 #include "driver/compiler_driver.h"
@@ -802,6 +805,9 @@ static CompiledMethod* CompileMethod(CompilerDriver& driver,
   return result;
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 CompiledMethod* CompileOneMethod(CompilerDriver& driver,
                                  Compiler* compiler,
                                  const DexFile::CodeItem* code_item,

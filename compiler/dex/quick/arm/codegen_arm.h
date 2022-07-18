@@ -19,12 +19,27 @@
 
 #include "arm_lir.h"
 #include "dex/compiler_internals.h"
+#include "dex/quick/mir_to_lir.h"
+
 
 namespace art {
 
+#ifdef MTK_ART_COMMON
+class ArmMir2Lir : public virtual Mir2Lir {
+  public:
+#else
 class ArmMir2Lir FINAL : public Mir2Lir {
   public:
+#endif
     ArmMir2Lir(CompilationUnit* cu, MIRGraph* mir_graph, ArenaAllocator* arena);
+    #ifdef MTK_ART_COMMON
+    virtual ~ArmMir2Lir() {}
+
+    // Optional for target - optimizations
+    virtual void ApplyGlobalOptimizations() OVERRIDE {}
+    int  GetNumAllocatableCoreRegs();
+    using Mir2Lir::InexpensiveConstantInt;
+    #endif
 
     // Required for target - codegen helpers.
     bool SmallLiteralDivRem(Instruction::Code dalvik_opcode, bool is_div, RegLocation rl_src,
@@ -118,7 +133,11 @@ class ArmMir2Lir FINAL : public Mir2Lir {
     void GenSpecialExitSequence();
     void GenFillArrayData(DexOffset table_offset, RegLocation rl_src);
     void GenFusedFPCmpBranch(BasicBlock* bb, MIR* mir, bool gt_bias, bool is_double);
+    #ifdef MTK_ART_COMMON
+    virtual void GenFusedLongCmpBranch(BasicBlock* bb, MIR* mir);
+    #else
     void GenFusedLongCmpBranch(BasicBlock* bb, MIR* mir);
+    #endif
     void GenSelect(BasicBlock* bb, MIR* mir);
     void GenSelectConst32(RegStorage left_op, RegStorage right_op, ConditionCode code,
                           int32_t true_val, int32_t false_val, RegStorage rs_dest,
@@ -187,12 +206,19 @@ class ArmMir2Lir FINAL : public Mir2Lir {
     LIR* InvokeTrampoline(OpKind op, RegStorage r_tgt, QuickEntrypointEnum trampoline) OVERRIDE;
     size_t GetInstructionOffset(LIR* lir);
 
+#ifdef MTK_ART_COMMON
+    void GenFusedLongCmpImmBranch(BasicBlock* bb, RegLocation rl_src1, int64_t val,
+                                  ConditionCode ccode);
+#endif
+
   private:
     void GenNegLong(RegLocation rl_dest, RegLocation rl_src);
     void GenMulLong(Instruction::Code opcode, RegLocation rl_dest, RegLocation rl_src1,
                     RegLocation rl_src2);
+#ifndef MTK_ART_COMMON
     void GenFusedLongCmpImmBranch(BasicBlock* bb, RegLocation rl_src1, int64_t val,
                                   ConditionCode ccode);
+#endif
     LIR* LoadFPConstantValue(int r_dest, int value);
     LIR* LoadStoreUsingInsnWithOffsetImm8Shl2(ArmOpcode opcode, RegStorage r_base,
                                               int displacement, RegStorage r_src_dest,

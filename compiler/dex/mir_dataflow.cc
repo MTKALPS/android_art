@@ -463,10 +463,18 @@ const uint64_t MIRGraph::oat_data_flow_attributes_[kMirOpLast] = {
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
 
   // 90 ADD_INT vAA, vBB, vCC
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UB | DF_UC | DF_CORE_A | DF_CORE_B | DF_CORE_C | DF_IS_LINEAR,
+#else
   DF_DA | DF_UB | DF_UC | DF_CORE_A | DF_CORE_B | DF_CORE_C,
+#endif
 
   // 91 SUB_INT vAA, vBB, vCC
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UB | DF_UC | DF_CORE_A | DF_CORE_B | DF_CORE_C | DF_IS_LINEAR,
+#else
   DF_DA | DF_UB | DF_UC | DF_CORE_A | DF_CORE_B | DF_CORE_C,
+#endif
 
   // 92 MUL_INT vAA, vBB, vCC
   DF_DA | DF_UB | DF_UC | DF_CORE_A | DF_CORE_B | DF_CORE_C,
@@ -559,10 +567,18 @@ const uint64_t MIRGraph::oat_data_flow_attributes_[kMirOpLast] = {
   DF_DA | DF_A_WIDE | DF_UB | DF_B_WIDE | DF_UC | DF_C_WIDE | DF_FP_A | DF_FP_B | DF_FP_C,
 
   // B0 ADD_INT_2ADDR vA, vB
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UA | DF_UB | DF_CORE_A | DF_CORE_B | DF_IS_LINEAR,
+#else
   DF_DA | DF_UA | DF_UB | DF_CORE_A | DF_CORE_B,
+#endif
 
   // B1 SUB_INT_2ADDR vA, vB
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UA | DF_UB | DF_CORE_A | DF_CORE_B | DF_IS_LINEAR,
+#else
   DF_DA | DF_UA | DF_UB | DF_CORE_A | DF_CORE_B,
+#endif
 
   // B2 MUL_INT_2ADDR vA, vB
   DF_DA | DF_UA | DF_UB | DF_CORE_A | DF_CORE_B,
@@ -655,7 +671,11 @@ const uint64_t MIRGraph::oat_data_flow_attributes_[kMirOpLast] = {
   DF_DA | DF_A_WIDE | DF_UA | DF_UB | DF_B_WIDE | DF_FP_A | DF_FP_B,
 
   // D0 ADD_INT_LIT16 vA, vB, #+CCCC
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UB | DF_CORE_A | DF_CORE_B | DF_IS_LINEAR,
+#else
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
+#endif
 
   // D1 RSUB_INT vA, vB, #+CCCC
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
@@ -679,7 +699,11 @@ const uint64_t MIRGraph::oat_data_flow_attributes_[kMirOpLast] = {
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
 
   // D8 ADD_INT_LIT8 vAA, vBB, #+CC
+#ifdef MTK_ART_COMMON
+  DF_DA | DF_UB | DF_CORE_A | DF_CORE_B | DF_IS_LINEAR,
+#else
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
+#endif
 
   // D9 RSUB_INT_LIT8 vAA, vBB, #+CC
   DF_DA | DF_UB | DF_CORE_A | DF_CORE_B,
@@ -888,6 +912,89 @@ const uint64_t MIRGraph::oat_data_flow_attributes_[kMirOpLast] = {
 
   // 129 MirOpReturnVectorRegisters
   0,
+
+#ifdef MTK_ART_COMMON /* Add MIR extension */
+  // 130 MtkExtMIROp1
+  0,
+
+  // 131 MtkExtMIROp2
+  0,
+
+  // 132 MtkExtMIROp3
+  0,
+
+  // 133 MtkExtMIROp4
+  0,
+
+  // 134 MtkExtMIROp5
+  0,
+
+  // 135 MtkExtMIROp6
+  0,
+
+  // 136 MtkExtMIROp7
+  DF_DA | DF_UA | DF_UB | DF_UC | DF_FP_A | DF_FP_B | DF_FP_C,
+
+  // 137 MtkExtMIROp8
+  DF_DA | DF_UA | DF_A_WIDE | DF_UB | DF_B_WIDE | DF_UC | DF_C_WIDE | DF_FP_A | DF_FP_B | DF_FP_C,
+
+  // 138 MtkExtMIROp9
+  DF_UA | DF_UB,
+
+  // 139 MtkExtMIROp10
+  DF_UA | DF_UB,
+
+  // 140 MtkExtMIROp11
+  DF_UA,
+
+  // 141 MtkExtMIROp12
+  DF_NOP,
+
+  // 142 MtkExtMIROp13
+  DF_DA | DF_A_WIDE | DF_UB | DF_B_WIDE | DF_IS_MOVE,
+
+  // 143 MtkExtMIROp14
+  DF_UA,
+
+  // 144 MtkExtMIROp15
+  DF_UA | DF_A_WIDE | DF_CORE_A,
+
+  // 145 MtkExtMIROp16
+  DF_DA | DF_A_WIDE | DF_UB | DF_B_WIDE | DF_CORE_A | DF_CORE_B,
+
+  // 146 MtkExtMIROp17
+  DF_NOP,
+
+  // 147 MtkExtMIROp18
+  DF_UA | DF_CORE_A,
+
+  // 148 MtkExtMIROp19
+  DF_UA | DF_UB,
+
+  // 149 MtkExtMIROp20
+  DF_UA | DF_UB | DF_UC,
+
+  // 150 MtkExtMIROp21
+  DF_UA | DF_UB | DF_UC,
+
+  // 151 MtkExtMIROp22
+  DF_DA | DF_UB | DF_UC | DF_REF_B | DF_CORE_C,
+
+  // 152 MtkExtMIROp23
+  DF_UA | DF_UB | DF_UC | DF_REF_B | DF_CORE_C,
+
+  // 153 MtkExtMIROp24
+  DF_DA | DF_A_WIDE | DF_UB | DF_UC | DF_REF_B | DF_CORE_C,
+
+  // 154 MtkExtMIROp25
+  DF_UA | DF_A_WIDE |DF_UB | DF_UC | DF_REF_B | DF_CORE_C,
+
+  // 155 MtkExtMIROp26
+  DF_DA | DF_UB | DF_REF_A | DF_REF_B,
+
+  // 156 MtkExtMIROp27
+  DF_DA | DF_UB | DF_UC | DF_REF_A  | DF_REF_B | DF_CORE_C,
+#endif
 };
 
 /* Return the base virtual register for a SSA name */
@@ -1322,7 +1429,12 @@ void MIRGraph::CountUses(struct BasicBlock* bb) {
   uint32_t depth = std::min(3U, static_cast<uint32_t>(bb->nesting_depth));
   uint32_t weight = std::max(1U, depth * 100);
   for (MIR* mir = bb->first_mir_insn; (mir != NULL); mir = mir->next) {
+    #ifdef MTK_ART_COMMON
+    if (mir->ssa_rep == NULL ||
+        mir->dalvikInsn.opcode == static_cast<Instruction::Code>(kMirOpNop)) {
+    #else
     if (mir->ssa_rep == NULL) {
+    #endif
       continue;
     }
     for (int i = 0; i < mir->ssa_rep->num_uses; i++) {

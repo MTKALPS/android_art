@@ -25,6 +25,11 @@
 #include <string>
 #include <vector>
 
+#ifdef HAVE_ANDROID_OS
+#include "cutils/properties.h"  //M
+#endif
+
+
 #if defined(__linux__) && defined(__arm__)
 #include <sys/personality.h>
 #include <sys/utsname.h>
@@ -334,6 +339,12 @@ class Dex2Oat {
     return ReadImageClasses(image_classes_stream);
   }
 
+#ifdef MTK_ART_COMMON
+  void SetCompilerArgs(std::string compiler_args) {
+    compiler_args_ = compiler_args;
+  }
+#endif
+
   bool PatchOatCode(const CompilerDriver* compiler_driver, File* oat_file,
                     const std::string& oat_location, std::string* error_msg) {
     // We asked to include patch information but we are not making an image. We need to fix
@@ -404,6 +415,9 @@ class Dex2Oat {
                                                               profile_file));
 
     driver->GetCompiler()->SetBitcodeFileName(*driver.get(), bitcode_filename);
+#ifdef MTK_ART_COMMON
+    driver->SetCompilerArgs(compiler_args_);
+#endif
 
     driver->CompileAll(class_loader, dex_files, &timings);
 
@@ -587,6 +601,9 @@ class Dex2Oat {
   Runtime* runtime_;
   size_t thread_count_;
   uint64_t start_ns_;
+#ifdef MTK_ART_COMMON
+  std::string compiler_args_;
+#endif
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Dex2Oat);
 };
@@ -738,6 +755,9 @@ static InstructionSetFeatures ParseFeatureList(std::string str) {
   for (FeatureList::iterator i = features.begin(); i != features.end(); i++) {
     std::string feature = Trim(*i);
     if (feature == "default") {
+      #ifdef MTK_ART_COMMON
+      result.SetHasDivideInstruction(true);
+      #endif
       // Nothing to do.
     } else if (feature == "div") {
       // Supports divide instruction.
@@ -751,6 +771,14 @@ static InstructionSetFeatures ParseFeatureList(std::string str) {
     } else if (feature == "nolpae") {
       // Turn off support for Large Physical Address Extension.
       result.SetHasLpae(false);
+#ifdef MTK_ART_COMMON
+    } else if (feature == "ooo") {
+      // Support out of order.
+      result.SetHasOutOfOrder(true);
+    } else if (feature == "noooo") {
+      // Turn off support for out of order.
+      result.SetHasOutOfOrder(false);
+#endif
     } else {
       Usage("Unknown instruction set feature: '%s'", feature.c_str());
     }
@@ -867,7 +895,13 @@ static int dex2oat(int argc, char** argv) {
   uintptr_t image_base = 0;
   std::string android_root;
   std::vector<const char*> runtime_args;
+#ifdef MTK_ART_COMMON
+  std::string compiler_args;
+#endif
   int thread_count = sysconf(_SC_NPROCESSORS_CONF);
+  //if (thread_count >= 2)  {
+  //  thread_count /= 2;
+  //}
   Compiler::Kind compiler_kind = kUsePortableCompiler
       ? Compiler::kPortable
       : Compiler::kQuick;
@@ -907,6 +941,16 @@ static int dex2oat(int argc, char** argv) {
   // Swap file.
   std::string swap_file_name;
   int swap_fd = -1;  // No swap file descriptor;
+
+#ifdef HAVE_ANDROID_OS
+  char dex2oat_thread_count[PROPERTY_VALUE_MAX];
+  if (property_get("dalvik.vm.dex2oat-threadcount", dex2oat_thread_count, NULL) > 0)  {
+    int cnt = atoi(dex2oat_thread_count);
+    if ((cnt <= sysconf(_SC_NPROCESSORS_CONF)) && (cnt >= 1))  {
+      thread_count = cnt;
+    }
+  }
+#endif
 
   for (int i = 0; i < argc; i++) {
     const StringPiece option(argv[i]);
@@ -1059,6 +1103,16 @@ static int dex2oat(int argc, char** argv) {
         LOG(INFO) << "dex2oat: option[" << i << "]=" << argv[i];
       }
       runtime_args.push_back(argv[i]);
+#ifdef MTK_ART_COMMON
+    } else if (option == "--compiler-arg") {
+      if (++i >= argc) {
+        Usage("Missing required argument for --compiler-arg");
+      }
+      if (log_options) {
+        LOG(INFO) << "dex2oat: option[" << i << "]=" << argv[i];
+      }
+      compiler_args = argv[i];
+#endif
     } else if (option == "--dump-timing") {
       dump_timing = true;
     } else if (option == "--dump-passes") {
@@ -1537,6 +1591,13 @@ static int dex2oat(int argc, char** argv) {
     key_value_store->Put(OatHeader::kDex2OatHostKey, oss.str());
     key_value_store->Put(OatHeader::kPicKey, compile_pic ? "true" : "false");
   }
+
+#ifdef MTK_ART_COMMON
+  /*
+   * Set compiler arguments to dex2oat
+   */
+  dex2oat->SetCompilerArgs(compiler_args);
+#endif
 
   std::unique_ptr<const CompilerDriver> compiler(dex2oat->CreateOatFile(boot_image_option,
                                                                         android_root,

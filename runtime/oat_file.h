@@ -30,6 +30,11 @@
 #include "oat.h"
 #include "os.h"
 
+#ifdef MTK_ART_COMMON
+#include "stack.h"
+#include "verifier/method_verifier.h"
+#endif
+
 namespace art {
 
 class BitVector;
@@ -146,6 +151,24 @@ class OatFile {
     const uint8_t* GetGcMap() const;
     uint32_t GetGcMapOffset() const;
     uint32_t GetGcMapOffsetOffset() const;
+
+    #ifdef MTK_ART_COMMON
+    bool CheckExtendedVmapTable(const uint8_t* curr_vmap_table) const;
+    bool DescribeVRegAtDexPc(std::ostream& os,
+                          const DexFile::CodeItem* code_item,
+                          size_t reg, VRegKind kind, size_t native_pc_offset,
+                          InstructionSet isa) const;
+    void DescribeVRegAtDexPc(std::ostream& os,
+                          const DexFile::CodeItem* code_item, const uint8_t* raw_vmap_sets,
+                          size_t reg, VRegKind kind, size_t native_pc_offset,
+                          InstructionSet isa) const;
+    bool DumpExtendedGcMapAtNativePcOffset(std::ostream& os, const DexFile::CodeItem* code_item,
+                          size_t native_pc_offset, InstructionSet isa) const;
+    bool DumpExtendedVRegsAtDexPc(std::ostream& os, verifier::MethodVerifier* verifier,
+                          const DexFile::CodeItem* code_item, uint32_t dex_pc, size_t offset,
+                          InstructionSet isa) const;
+    bool DumpExtendedVmapTable(std::ostream& os) const;
+    #endif
 
     ~OatMethod();
 

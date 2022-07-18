@@ -605,4 +605,49 @@ bool OatFile::IsPic() const {
   // TODO: Check against oat_patches. b/18144996
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+bool OatFile::OatMethod::CheckExtendedVmapTable(const uint8_t* curr_vmap_table) const {
+  return false;
+}
+__attribute__((weak))
+bool OatFile::OatMethod::DescribeVRegAtDexPc(std::ostream& os,
+                                             const DexFile::CodeItem* code_item,
+                                             size_t reg,
+                                             VRegKind kind,
+                                             size_t native_pc_offset,
+                                             InstructionSet isa) const {
+  return false;
+}
+__attribute__((weak))
+void OatFile::OatMethod::DescribeVRegAtDexPc(std::ostream& os,
+                                             const DexFile::CodeItem* code_item,
+                                             const uint8_t* raw_vmap_sets,
+                                             size_t reg,
+                                             VRegKind kind,
+                                             size_t native_pc_offset,
+                                             InstructionSet isa) const {
+  return;
+}
+__attribute__((weak))
+bool OatFile::OatMethod::DumpExtendedGcMapAtNativePcOffset(std::ostream& os,
+                                                           const DexFile::CodeItem* code_item,
+                                                           size_t native_pc_offset,
+                                                           InstructionSet isa) const {
+  return false;
+}
+__attribute__((weak))
+bool OatFile::OatMethod::DumpExtendedVRegsAtDexPc(std::ostream& os,
+                                                  verifier::MethodVerifier* verifier,
+                                                  const DexFile::CodeItem* code_item,
+                                                  uint32_t dex_pc, size_t offset,
+                                                  InstructionSet isa) const {
+  return false;
+}
+__attribute__((weak))
+bool OatFile::OatMethod::DumpExtendedVmapTable(std::ostream& os) const {
+  return false;
+}
+#endif
+
 }  // namespace art

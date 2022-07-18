@@ -69,6 +69,13 @@ struct CompilationUnit {
   InstructionSetFeatures GetInstructionSetFeatures() {
     return compiler_driver->GetInstructionSetFeatures();
   }
+#ifdef MTK_ART_COMMON
+  uint64_t mtk_disable_opt;
+  uint64_t GetCompilerOptSwitch() const {
+    return compiler_driver->GetCompilerOptSwitch() & ~mtk_disable_opt;
+  }
+#endif
+
   // TODO: much of this info available elsewhere.  Go to the original source?
   uint16_t num_dalvik_registers;        // method->registers_size.
   const uint16_t* insns;

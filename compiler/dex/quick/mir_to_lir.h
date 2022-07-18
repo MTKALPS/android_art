@@ -93,6 +93,10 @@ typedef uint32_t CodeOffset;         // Native code offset in bytes.
 #define SETS_CCODES          (1ULL << kSetsCCodes)
 #define USES_CCODES          (1ULL << kUsesCCodes)
 #define USE_FP_STACK         (1ULL << kUseFpStack)
+#ifdef MTK_ART_COMMON
+#define SETS_FCCODES         (1ULL << kSetsFCCodes)
+#define USES_FCCODES         (1ULL << kUsesFCCodes)
+#endif
 #define REG_USE_LO           (1ULL << kUseLo)
 #define REG_USE_HI           (1ULL << kUseHi)
 #define REG_DEF_LO           (1ULL << kDefLo)
@@ -178,7 +182,12 @@ struct LIR {
     unsigned int size:4;         // Note: size of encoded instruction is in bytes.
     bool use_def_invalid:1;      // If true, masks should not be used.
     unsigned int generation:1;   // Used to track visitation state during fixup pass.
+#ifdef MTK_ART_COMMON
+    bool live_label:1;           // If true, someone jump to this label
+    unsigned int fixup:7;        // Fixup kind.
+#else
     unsigned int fixup:8;        // Fixup kind.
+#endif
   } flags;
   union {
     UseDefMasks m;               // Use & Def masks used during optimization.
@@ -727,7 +736,11 @@ class Mir2Lir : public Backend {
     // Shared by all targets - implemented in ralloc_util.cc
     int GetSRegHi(int lowSreg);
     bool LiveOut(int s_reg);
+    #ifdef MTK_ART_COMMON
+    virtual void SimpleRegAlloc();
+    #else
     void SimpleRegAlloc();
+    #endif
     void ResetRegPool();
     void CompilerInitPool(RegisterInfo* info, RegStorage* regs, int num);
     void DumpRegPool(GrowableArray<RegisterInfo*>* regs);
@@ -739,9 +752,17 @@ class Mir2Lir : public Backend {
     void ClobberSReg(int s_reg);
     void ClobberAliases(RegisterInfo* info, uint32_t clobber_mask);
     int SRegToPMap(int s_reg);
+    #ifdef MTK_ART_COMMON
+    virtual void RecordCorePromotion(RegStorage reg, int s_reg);
+    #else
     void RecordCorePromotion(RegStorage reg, int s_reg);
+    #endif
     RegStorage AllocPreservedCoreReg(int s_reg);
+    #ifdef MTK_ART_COMMON
+    virtual void RecordFpPromotion(RegStorage reg, int s_reg);
+    #else
     void RecordFpPromotion(RegStorage reg, int s_reg);
+    #endif
     RegStorage AllocPreservedFpReg(int s_reg);
     virtual RegStorage AllocPreservedSingle(int s_reg);
     virtual RegStorage AllocPreservedDouble(int s_reg);
@@ -807,6 +828,11 @@ class Mir2Lir : public Backend {
      */
     virtual RegLocation EvalLoc(RegLocation loc, int reg_class, bool update);
 
+    #ifdef MTK_ART_COMMON
+    RegLocation EvalLocReallocWide(RegLocation loc, int reg_class, bool update);
+    RegLocation EvalLocRealloc(RegLocation loc, int reg_class, bool update);
+    #endif
+
     void CountRefs(RefCounts* core_counts, RefCounts* fp_counts, size_t num_regs);
     void DumpCounts(const RefCounts* arr, int size, const char* msg);
     void DoPromotion();
@@ -820,7 +846,12 @@ class Mir2Lir : public Backend {
     void AddIntrinsicSlowPath(CallInfo* info, LIR* branch, LIR* resume = nullptr);
     virtual bool HandleEasyDivRem(Instruction::Code dalvik_opcode, bool is_div,
                                   RegLocation rl_src, RegLocation rl_dest, int lit);
+#ifdef MTK_ART_COMMON
+    virtual
     bool HandleEasyMultiply(RegLocation rl_src, RegLocation rl_dest, int lit);
+#else
+    bool HandleEasyMultiply(RegLocation rl_src, RegLocation rl_dest, int lit);
+#endif
     virtual void HandleSlowPaths();
     void GenBarrier();
     void GenDivZeroException();
@@ -830,6 +861,15 @@ class Mir2Lir : public Backend {
     void GenDivZeroCheck(RegStorage reg);
     void GenArrayBoundsCheck(RegStorage index, RegStorage length);
     void GenArrayBoundsCheck(int32_t index, RegStorage length);
+    #ifdef MTK_ART_COMMON
+    LIR* MTKGenNullCheck(RegStorage reg, int opt_flags);
+    void MTKMarkPossibleNullPointerException(int opt_flags);
+    void MTKForceImplicitNullCheck(RegStorage reg, int opt_flags);
+    virtual void MTKMarkSafepointPC(LIR* safepoint_pc);
+    virtual void MTKMarkCurrentOffset(MIR* curr_mir);
+    virtual void MTKMarkCurrentOffset(uint32_t offset);
+    virtual void MTKAddPc2DexMapping(LIR* tgt_lir);
+    #endif
     LIR* GenNullCheck(RegStorage reg);
     void MarkPossibleNullPointerException(int opt_flags);
     void MarkPossibleNullPointerExceptionAfter(int opt_flags, LIR* after);
@@ -1083,7 +1123,11 @@ class Mir2Lir : public Backend {
     virtual void StoreFinalValueWide(RegLocation rl_dest, RegLocation rl_src);
 
     // Shared by all targets - implemented in mir_to_lir.cc.
+    #ifdef MTK_ART_COMMON
+    virtual void CompileDalvikInstruction(MIR* mir, BasicBlock* bb, LIR* label_list);
+    #else
     void CompileDalvikInstruction(MIR* mir, BasicBlock* bb, LIR* label_list);
+    #endif
     virtual void HandleExtendedMethodMIR(BasicBlock* bb, MIR* mir);
     bool MethodBlockCodeGen(BasicBlock* bb);
     bool SpecialMIR2LIR(const InlineMethod& special);
@@ -1381,6 +1425,12 @@ class Mir2Lir : public Backend {
                              bool card_mark) = 0;
     virtual void GenShiftImmOpLong(Instruction::Code opcode, RegLocation rl_dest,
                                    RegLocation rl_src1, RegLocation rl_shift) = 0;
+    #ifdef MTK_ART_COMMON
+    // Shared by all targets - implemented in global_optimizations.cc
+    virtual void ApplyGlobalOptimizations() {}
+    virtual bool MtkHandleExtendedMethodMIR(BasicBlock* bb, MIR* mir) { return false; }
+    virtual int  GetNumAllocatableCoreRegs() { return 0; }
+    #endif
 
     // Required for target - single operation generators.
     virtual LIR* OpUnconditionalBranch(LIR* target) = 0;

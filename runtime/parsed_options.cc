@@ -265,6 +265,57 @@ bool ParsedOptions::Parse(const RuntimeOptions& options, bool ignore_unrecognize
 //  gLogVerbosity.threads = true;  // TODO: don't check this in!
 //  gLogVerbosity.verifier = true;  // TODO: don't check this in!
 
+#if defined(MTK_DEBUG_VLOG) && defined(HAVE_ANDROID_OS)
+    char propStr[PROPERTY_VALUE_MAX];
+    property_get("dalvik.vm.debug.vlog", propStr, "");
+    if (*propStr != 0)  {
+        LOG(INFO) << "vm.debug = " << propStr;
+        int arg = (int) strtol(propStr, NULL, 16);
+
+        if ((arg & ~(MTK_DEBUG_VLOG_ALL_FLAG)) == 0)  {
+            if (arg & MTK_DEBUG_VLOG_CLASS) {
+                gLogVerbosity.class_linker = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_COMPILER) {
+                gLogVerbosity.compiler = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_GC) {
+                gLogVerbosity.gc = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_HEAP) {
+                gLogVerbosity.heap = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_JDWP) {
+                gLogVerbosity.jdwp = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_JNI) {
+                gLogVerbosity.jni = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_MONITOR) {
+                gLogVerbosity.monitor = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_PROFILER) {
+                gLogVerbosity.profiler = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_SIGNALS) {
+                gLogVerbosity.signals = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_STARTUP) {
+                gLogVerbosity.startup = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_THIRD_PARTY_JNI) {
+                gLogVerbosity.third_party_jni = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_THREADS) {
+                gLogVerbosity.threads = true;
+            }
+            if (arg & MTK_DEBUG_VLOG_VERIFIER) {
+                gLogVerbosity.verifier = true;
+            }
+        }
+    }
+#endif
+
   method_trace_ = false;
   method_trace_file_ = "/data/method-trace-file.bin";
   method_trace_file_size_ = 10 * MB;
@@ -628,6 +679,10 @@ bool ParsedOptions::Parse(const RuntimeOptions& options, bool ignore_unrecognize
       if (!ParseStringAfterChar(option, '=', &native_bridge_library_filename_)) {
         return false;
       }
+    #ifdef MTK_ART_LOG
+    } else if (StartsWith(option, "-mtkdbg:")) {
+      gMtkLogLevel = ParseIntegerOrDie(option);
+    #endif
     } else if (StartsWith(option, "-ea") ||
                StartsWith(option, "-da") ||
                StartsWith(option, "-enableassertions") ||
@@ -921,5 +976,21 @@ bool ParsedOptions::ParseDouble(const std::string& option, char after_char,
   *parsed_value = value;
   return true;
 }
+
+#ifdef MTK_ART_COMMON
+size_t ParsedOptions::ParseIntegerOrDie(const std::string& s) {
+  std::string::size_type colon = s.find(':');
+  if (colon == std::string::npos) {
+    LOG(FATAL) << "Missing integer: " << s;
+  }
+  const char* begin = &s[colon + 1];
+  char* end;
+  size_t result = strtoul(begin, &end, 10);
+  if (begin == end || *end != '\0') {
+    LOG(FATAL) << "Failed to parse integer in: " << s;
+  }
+  return result;
+}
+#endif
 
 }  // namespace art

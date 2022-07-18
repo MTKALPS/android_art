@@ -403,6 +403,10 @@ CompilerDriver::CompilerDriver(const CompilerOptions* compiler_options,
       LOG(INFO) << "Failed to load profile file " << profile_file;
     }
   }
+
+  #ifdef MTK_ART_COMMON
+  SetDefaultCompilerArgs();
+  #endif
 }
 
 SwapVector<uint8_t>* CompilerDriver::DeduplicateCode(const ArrayRef<const uint8_t>& code) {
@@ -2323,5 +2327,16 @@ std::string CompilerDriver::GetMemoryUsageString(bool extended) const {
   }
   return oss.str();
 }
+
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+void CompilerDriver::SetDefaultCompilerArgs() {
+  return;
+}
+__attribute__((weak))
+void CompilerDriver::SetCompilerArgs(std::string compiler_args) {
+  return;
+}
+#endif
 
 }  // namespace art

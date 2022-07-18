@@ -515,6 +515,9 @@ void MIRGraph::InitRegLocations() {
  * base Dalvik virtual register.  Once we add a better register
  * allocator, remove this remapping.
  */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void MIRGraph::RemapRegLocations() {
   for (int i = 0; i < GetNumSSARegs(); i++) {
     if (reg_location_[i].location != kLocCompilerTemp) {

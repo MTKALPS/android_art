@@ -1262,8 +1262,12 @@ class CheckJNI {
   }
 
   static jboolean IsSameObject(JNIEnv* env, jobject ref1, jobject ref2) {
+    #ifdef MTK_GOOGLE_BINDER_ISSUE_WORKAROUND
+    return baseEnv(env)->IsSameObject(env, ref1, ref2);
+    #else
     CHECK_JNI_ENTRY(kFlag_Default, "ELL", env, ref1, ref2);
     return CHECK_JNI_EXIT("b", baseEnv(env)->IsSameObject(env, ref1, ref2));
+    #endif
   }
 
   static jobject AllocObject(JNIEnv* env, jclass c) {

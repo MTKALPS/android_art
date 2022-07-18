@@ -1122,7 +1122,11 @@ void Arm64Mir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
   }
 
   /* null object? */
+  #ifdef MTK_ART_COMMON
+  MTKGenNullCheck(rl_array.reg, opt_flags);
+  #else
   GenNullCheck(rl_array.reg, opt_flags);
+  #endif
 
   bool needs_range_check = (!(opt_flags & MIR_IGNORE_RANGE_CHECK));
   RegStorage reg_len;
@@ -1130,9 +1134,21 @@ void Arm64Mir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
     reg_len = AllocTemp();
     /* Get len */
     Load32Disp(rl_array.reg, len_offset, reg_len);
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
   } else {
+    // FIXME: Phone boot will fail if this tweak works with
+    //        kOptLocalValueNumbering, currently turning off
+    //        kOptLocalValueNumbering has better performance
+    //        aspecially in 0xBenchmark.
+    #ifdef MTK_ART_COMMON
+    MTKForceImplicitNullCheck(rl_array.reg, opt_flags);
+    #else
     ForceImplicitNullCheck(rl_array.reg, opt_flags);
+    #endif
   }
   if (rl_dest.wide || rl_dest.fp || constant_index) {
     RegStorage reg_ptr;
@@ -1155,12 +1171,19 @@ void Arm64Mir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
       }
       FreeTemp(reg_len);
     }
+    #ifdef MTK_ART_COMMON
+    data_offset = MTKGenArrayGet1(data_offset, scale, rl_dest.wide);
+    #endif
     if (rl_result.ref) {
       LoadRefDisp(reg_ptr, data_offset, rl_result.reg, kNotVolatile);
     } else {
       LoadBaseDisp(reg_ptr, data_offset, rl_result.reg, size, kNotVolatile);
     }
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
     if (!constant_index) {
       FreeTemp(reg_ptr);
     }
@@ -1169,6 +1192,9 @@ void Arm64Mir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
     } else {
       StoreValue(rl_dest, rl_result);
     }
+    #ifdef MTK_ART_COMMON
+    MTKGenArrayGet2(needs_range_check, data_offset, reg_ptr);
+    #endif
   } else {
     // Offset base, then use indexed load
     RegStorage reg_ptr = AllocTempRef();
@@ -1185,7 +1211,11 @@ void Arm64Mir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
     } else {
       LoadBaseIndexed(reg_ptr, As64BitReg(rl_index.reg), rl_result.reg, scale, size);
     }
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
     FreeTemp(reg_ptr);
     StoreValue(rl_dest, rl_result);
   }
@@ -1212,6 +1242,9 @@ void Arm64Mir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
   if (constant_index) {
     data_offset += mir_graph_->ConstantValue(rl_index) << scale;
   }
+  #ifdef MTK_ART_COMMON
+  data_offset = MTKGenArrayGet1(data_offset, scale, rl_src.wide);
+  #endif
 
   rl_array = LoadValue(rl_array, kRefReg);
   if (!constant_index) {
@@ -1231,7 +1264,11 @@ void Arm64Mir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
   }
 
   /* null object? */
+  #ifdef MTK_ART_COMMON
+  MTKGenNullCheck(rl_array.reg, opt_flags);
+  #else
   GenNullCheck(rl_array.reg, opt_flags);
+  #endif
 
   bool needs_range_check = (!(opt_flags & MIR_IGNORE_RANGE_CHECK));
   RegStorage reg_len;
@@ -1240,9 +1277,21 @@ void Arm64Mir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
     // NOTE: max live temps(4) here.
     /* Get len */
     Load32Disp(rl_array.reg, len_offset, reg_len);
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
   } else {
+    // FIXME: Phone boot will fail if this tweak works with
+    //        kOptLocalValueNumbering, currently turning off
+    //        kOptLocalValueNumbering has better performance
+    //        aspecially in 0xBenchmark.
+    #ifdef MTK_ART_COMMON
+    MTKForceImplicitNullCheck(rl_array.reg, opt_flags);
+    #else
     ForceImplicitNullCheck(rl_array.reg, opt_flags);
+    #endif
   }
   /* at this point, reg_ptr points to array, 2 live temps */
   if (rl_src.wide || rl_src.fp || constant_index) {
@@ -1268,7 +1317,11 @@ void Arm64Mir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
     } else {
       StoreBaseDisp(reg_ptr, data_offset, rl_src.reg, size, kNotVolatile);
     }
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
   } else {
     /* reg_ptr -> array data */
     OpRegRegImm(kOpAdd, reg_ptr, rl_array.reg, data_offset);
@@ -1282,7 +1335,11 @@ void Arm64Mir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
     } else {
       StoreBaseIndexed(reg_ptr, As64BitReg(rl_index.reg), rl_src.reg, scale, size);
     }
+    #ifdef MTK_ART_COMMON
+    MTKMarkPossibleNullPointerException(opt_flags);
+    #else
     MarkPossibleNullPointerException(opt_flags);
+    #endif
   }
   if (allocated_reg_ptr_temp) {
     FreeTemp(reg_ptr);

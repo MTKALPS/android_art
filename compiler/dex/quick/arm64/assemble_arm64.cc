@@ -622,6 +622,26 @@ const ArmEncodingMap Arm64Mir2Lir::EncodingMap[kA64Last] = {
                  kFmtRegR, 4, 0, kFmtRegR, 9, 5, kFmtBitBlt, 21, 16,
                  kFmtBitBlt, 15, 10, IS_QUAD_OP | REG_DEF0_USE1,
                  "ubfm", "!0r, !1r, !2d, !3d", kFixupNone),
+#ifdef MTK_ART_COMMON
+    // C5.6
+    ENCODING_MAP(kA64Prfmi3wXF, NO_VARIANTS(0xf9800000),
+                 kFmtBitBlt, 4, 0, kFmtRegXOrSp, 9, 5, kFmtBitBlt, 21, 10,
+                 kFmtUnused, -1, -1, IS_TERTIARY_OP | REG_USE1,
+                 "prfm", "!0d, [!1X, #!2D]", kFixupNone),
+    // Like kA64Smaddl4xwwx
+    ENCODING_MAP(WIDE(kA64Madd4rrrr), NO_VARIANTS(0x1b000000),
+                 kFmtRegR, 4, 0, kFmtRegR, 9, 5, kFmtRegR, 14, 10,
+                 kFmtRegR, 20, 16, IS_QUAD_OP | REG_DEF0_USE123,
+                 "madd", "!0r, !1r, !3r, !2r", kFixupNone),
+    ENCODING_MAP(WIDE(kA64FmaddS4rrrr), NO_VARIANTS(0x1f000000),
+                 kFmtRegS, 4, 0, kFmtRegS, 9, 5, kFmtRegS, 14, 10,
+                 kFmtRegS, 20, 16, IS_QUAD_OP | REG_DEF0_USE123,
+                 "fmadd", "!0s, !1s, !3s, !2s", kFixupNone),
+    ENCODING_MAP(WIDE(kA64FmaddD4rrrr), NO_VARIANTS(0x1f400000),
+                 kFmtRegD, 4, 0, kFmtRegD, 9, 5, kFmtRegD, 14, 10,
+                 kFmtRegD, 20, 16, IS_QUAD_OP | REG_DEF0_USE123,
+                 "fmadd", "!0S, !1S, !3S, !2S", kFixupNone),
+#endif
 };
 
 // new_lir replaces orig_lir in the pcrel_fixup list.

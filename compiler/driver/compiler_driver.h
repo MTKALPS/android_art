@@ -190,6 +190,14 @@ class CompilerDriver {
   CompiledMethod* GetCompiledMethod(MethodReference ref) const
       LOCKS_EXCLUDED(compiled_methods_lock_);
 
+#ifdef MTK_ART_COMMON
+  void SetDefaultCompilerArgs();
+  void SetCompilerArgs(std::string compiler_args);
+  uint64_t GetCompilerOptSwitch() const {
+    return compiler_opt_switch_;
+  }
+#endif
+
   void AddRequiresConstructorBarrier(Thread* self, const DexFile* dex_file,
                                      uint16_t class_def_index);
   bool RequiresConstructorBarrier(Thread* self, const DexFile* dex_file, uint16_t class_def_index);
@@ -812,6 +820,10 @@ class CompilerDriver {
 
   class AOTCompilationStats;
   std::unique_ptr<AOTCompilationStats> stats_;
+
+#ifdef MTK_ART_COMMON
+  uint64_t compiler_opt_switch_;
+#endif
 
   bool dump_stats_;
   const bool dump_passes_;

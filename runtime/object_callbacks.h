@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "base/macros.h"
+#include "gc_root.h"
 
 namespace art {
 namespace mirror {
@@ -52,6 +53,24 @@ typedef mirror::Object* (IsMarkedCallback)(mirror::Object* object, void* arg) WA
 typedef bool (IsHeapReferenceMarkedCallback)(mirror::HeapReference<mirror::Object>* object,
     void* arg) WARN_UNUSED;
 typedef void (ProcessMarkStackCallback)(void* arg);
+
+#ifdef MTK_ART_COMMON
+// Class RootCallbackVisitor is moved from thread.cc
+class RootCallbackVisitor {
+ public:
+  RootCallbackVisitor(RootCallback* callback, void* arg, uint32_t tid)
+     : callback_(callback), arg_(arg), tid_(tid) {}
+
+  void operator()(mirror::Object** obj, size_t, const StackVisitor*) const {
+    callback_(obj, arg_, RootInfo(kRootVMInternal, tid_));
+  }
+
+ private:
+  RootCallback* const callback_;
+  void* const arg_;
+  const uint32_t tid_;
+};
+#endif
 
 }  // namespace art
 

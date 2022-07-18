@@ -84,6 +84,9 @@ COMPILE_ASSERT(InlineMethodAnalyser::IGetVariant(Instruction::IGET_SHORT) ==
 // fields. However, in the context of the debugger, not all methods and fields are resolved. Since
 // we need to be able to detect possibly inlined method, we pass a null inline method to indicate
 // we don't want to take unresolved methods and fields into account during analysis.
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 bool InlineMethodAnalyser::AnalyseMethodCode(verifier::MethodVerifier* verifier,
                                              InlineMethod* method) {
   DCHECK(verifier != nullptr);

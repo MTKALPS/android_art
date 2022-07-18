@@ -177,6 +177,7 @@ void FaultManager::HandleFault(int sig, siginfo_t* info, void* context) {
 }
 
 void FaultManager::AddHandler(FaultHandler* handler, bool generated_code) {
+  DCHECK(initialized_);
   if (generated_code) {
     generated_code_handlers_.push_back(handler);
   } else {

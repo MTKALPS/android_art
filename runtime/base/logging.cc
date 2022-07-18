@@ -29,6 +29,14 @@ std::vector<std::string> gVerboseMethods;
 
 unsigned int gAborting = 0;
 
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+char* gOomeHprofPath = NULL;
+#endif
+
+#if defined (HAVE_ANDROID_OS) && defined(MTK_EXPLICIT_GC_DEBUG)
+bool gLogExplicitGC = false;
+#endif
+
 static LogSeverity gMinimumLogSeverity = INFO;
 static std::unique_ptr<std::string> gCmdLine;
 static std::unique_ptr<std::string> gProgramInvocationName;
@@ -158,8 +166,22 @@ LogMessage::~LogMessage() {
 
   // Abort if necessary.
   if (data_->severity == FATAL) {
-    Runtime::Abort();
+    // workaround
+    //Runtime::Abort();
+  #if defined(__GLIBC__)
+    syscall(__NR_tgkill, getpid(), GetTid(), SIGABRT);
+    exit(1);
+  #else
+    abort();
+  #endif    
   }
 }
+
+#ifdef MTK_ART_LOG
+//
+// For MTK LOG
+//
+int gMtkLogLevel = 0;
+#endif
 
 }  // namespace art

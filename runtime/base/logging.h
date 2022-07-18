@@ -143,6 +143,15 @@
 #define VLOG(module) if (VLOG_IS_ON(module)) ::art::LogMessage(__FILE__, __LINE__, INFO, -1).stream()
 #define VLOG_STREAM(module) ::art::LogMessage(__FILE__, __LINE__, INFO, -1).stream()
 
+#ifdef MTK_ART_LOG
+#define MTK_LOG(level, message) { if (level <= ::art::gMtkLogLevel) { message; } }
+#else
+#define MTK_LOG(level, message) {}
+
+// MTK LOG
+extern int gMtkLogLevel;
+#endif
+
 //
 // Implementation details beyond this point.
 //
@@ -329,6 +338,13 @@ extern const char* GetCmdLine();
 extern const char* ProgramInvocationName();
 extern const char* ProgramInvocationShortName();
 
+#if defined(HAVE_ANDROID_OS) && defined(MTK_DUMP_HPROF_WHEN_OOME)
+extern char* gOomeHprofPath;
+#endif
+
+#if defined (HAVE_ANDROID_OS) && defined(MTK_EXPLICIT_GC_DEBUG)
+extern bool gLogExplicitGC;
+#endif
 }  // namespace art
 
 #endif  // ART_RUNTIME_BASE_LOGGING_H_

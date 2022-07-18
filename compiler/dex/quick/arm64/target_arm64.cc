@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "backend_arm64.h"
 #include "dex/compiler_internals.h"
 #include "dex/quick/mir_to_lir-inl.h"
 #include "dex/reg_storage_eq.h"
@@ -450,6 +451,12 @@ std::string Arm64Mir2Lir::BuildInsnString(const char* fmt, LIR* lir, unsigned ch
                strcpy(tbuf, "sp");
              break;
            case 'D':
+#ifdef MTK_ART_COMMON
+             if (lir->opcode == kA64Prfmi3wXF) {
+                 snprintf(tbuf, arraysize(tbuf), "%d", operand*8);
+                 break;
+             }
+#endif
              snprintf(tbuf, arraysize(tbuf), "%d", operand*((IS_WIDE(lir->opcode)) ? 8 : 4));
              break;
            case 'E':
@@ -589,6 +596,9 @@ Arm64Mir2Lir::Arm64Mir2Lir(CompilationUnit* cu, MIRGraph* mir_graph, ArenaAlloca
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 Mir2Lir* Arm64CodeGenerator(CompilationUnit* const cu, MIRGraph* const mir_graph,
                             ArenaAllocator* const arena) {
   return new Arm64Mir2Lir(cu, mir_graph, arena);
@@ -1199,5 +1209,14 @@ int Arm64Mir2Lir::GenDalvikArgsRange(CallInfo* info, int call_state,
   }
   return call_state;
 }
+#ifdef MTK_ART_COMMON
+int Arm64Mir2Lir::GetNumAllocatableCoreRegs() {
+  int num_regs = core_regs.size();
+  int num_reserved = reserved_regs.size();
+  int num_temps = core_temps.size();
+  CHECK_GT(num_regs, (num_reserved + num_temps));
+  return num_regs - num_reserved - num_temps;
+}
+#endif
 
 }  // namespace art

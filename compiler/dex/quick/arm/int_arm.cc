@@ -706,6 +706,9 @@ RegLocation ArmMir2Lir::GenDivRemLit(RegLocation rl_dest, RegStorage reg1, int l
   return rl_result;
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 RegLocation ArmMir2Lir::GenDivRem(RegLocation rl_dest, RegStorage reg1, RegStorage reg2,
                                   bool is_div) {
   RegLocation rl_result = EvalLoc(rl_dest, kCoreReg, true);
@@ -1162,6 +1165,9 @@ void ArmMir2Lir::GenNegLong(RegLocation rl_dest, RegLocation rl_src) {
   StoreValueWide(rl_dest, rl_result);
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void ArmMir2Lir::GenMulLong(Instruction::Code opcode, RegLocation rl_dest,
                             RegLocation rl_src1, RegLocation rl_src2) {
     /*
@@ -1378,6 +1384,9 @@ void ArmMir2Lir::GenArrayGet(int opt_flags, OpSize size, RegLocation rl_array,
  * Generate array store
  *
  */
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 void ArmMir2Lir::GenArrayPut(int opt_flags, OpSize size, RegLocation rl_array,
                              RegLocation rl_index, RegLocation rl_src, int scale, bool card_mark) {
   RegisterClass reg_class = RegClassBySize(size);
@@ -1587,6 +1596,9 @@ void ArmMir2Lir::GenArithImmOpLong(Instruction::Code opcode,
   switch (opcode) {
     case Instruction::ADD_LONG:
     case Instruction::ADD_LONG_2ADDR:
+      #ifdef MTK_ART_COMMON
+      DCHECK_NE(rl_result.reg.GetLowReg(), rl_src1.reg.GetHighReg());
+      #endif
       NewLIR3(kThumb2AddRRI8M, rl_result.reg.GetLowReg(), rl_src1.reg.GetLowReg(), mod_imm_lo);
       NewLIR3(kThumb2AdcRRI8M, rl_result.reg.GetHighReg(), rl_src1.reg.GetHighReg(), mod_imm_hi);
       break;

@@ -17,6 +17,7 @@
 #ifndef ART_COMPILER_DEX_BB_OPTIMIZATIONS_H_
 #define ART_COMPILER_DEX_BB_OPTIMIZATIONS_H_
 
+#include "base/casts.h"
 #include "compiler_internals.h"
 #include "pass_me.h"
 
@@ -128,6 +129,9 @@ class CodeLayout : public PassME {
     DCHECK(data != nullptr);
     CompilationUnit* c_unit = down_cast<PassMEDataHolder*>(data)->c_unit;
     DCHECK(c_unit != nullptr);
+    #ifdef MTK_ART_COMMON
+    c_unit->mir_graph->SetConditionalBlock();
+    #endif
     c_unit->mir_graph->VerifyDataflow();
     c_unit->mir_graph->ClearAllVisitedFlags();
   }
@@ -272,6 +276,9 @@ class BBOptimizations : public PassME {
   }
 
   void Start(PassDataHolder* data) const;
+#ifdef MTK_ART_COMMON
+  void End(PassDataHolder* data) const;
+#endif
 };
 
 }  // namespace art

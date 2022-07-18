@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "backend_arm.h"
 #include "dex/compiler_internals.h"
 #include "dex/quick/mir_to_lir-inl.h"
 
@@ -561,6 +562,9 @@ ArmMir2Lir::ArmMir2Lir(CompilationUnit* cu, MIRGraph* mir_graph, ArenaAllocator*
   }
 }
 
+#ifdef MTK_ART_COMMON
+__attribute__((weak))
+#endif
 Mir2Lir* ArmCodeGenerator(CompilationUnit* const cu, MIRGraph* const mir_graph,
                           ArenaAllocator* const arena) {
   return new ArmMir2Lir(cu, mir_graph, arena);
@@ -824,5 +828,15 @@ RegStorage ArmMir2Lir::AllocPreservedSingle(int s_reg) {
   }
   return res;
 }
+
+#ifdef MTK_ART_COMMON
+int ArmMir2Lir::GetNumAllocatableCoreRegs() {
+  int num_regs = core_regs.size();
+  int num_reserved = reserved_regs.size();
+  int num_temps = core_temps.size();
+  CHECK_GT(num_regs, (num_reserved + num_temps));
+  return num_regs - num_reserved - num_temps;
+}
+#endif
 
 }  // namespace art

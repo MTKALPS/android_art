@@ -38,13 +38,16 @@
 #include "utils.h"
 #include "well_known_classes.h"
 
+
 namespace art {
 
 static constexpr uint64_t kLongThreadSuspendThreshold = MsToNs(5);
 
+
 ThreadList::ThreadList()
     : suspend_all_count_(0), debug_suspend_all_count_(0),
-      thread_exit_cond_("thread exit condition variable", *Locks::thread_list_lock_) {
+      thread_exit_cond_("thread exit condition variable", *Locks::thread_list_lock_)
+    {
   CHECK(Monitor::IsValidLockWord(LockWord::FromThinLockId(kMaxThreadId, 1)));
 }
 
@@ -336,7 +339,7 @@ void ThreadList::SuspendAll() {
   // Block on the mutator lock until all Runnable threads release their share of access.
 #if HAVE_TIMED_RWLOCK
   // Timeout if we wait more than 30 seconds.
-  if (!Locks::mutator_lock_->ExclusiveLockWithTimeout(self, 30 * 1000, 0)) {
+  if (!Locks::mutator_lock_->ExclusiveLockWithTimeout(self, 60 * 1000, 0)) {
     UnsafeLogFatalForThreadSuspendAllTimeout();
   }
 #else
@@ -643,7 +646,7 @@ void ThreadList::SuspendAllForDebugger() {
   // immediately unlock again.
 #if HAVE_TIMED_RWLOCK
   // Timeout if we wait more than 30 seconds.
-  if (!Locks::mutator_lock_->ExclusiveLockWithTimeout(self, 30 * 1000, 0)) {
+  if (!Locks::mutator_lock_->ExclusiveLockWithTimeout(self, 60 * 1000, 0)) {
     UnsafeLogFatalForThreadSuspendAllTimeout();
   } else {
     Locks::mutator_lock_->ExclusiveUnlock(self);
